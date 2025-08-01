@@ -1,0 +1,9 @@
+[package]
+name = "bevy_av1"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.16.1"
+bitstream-io = "4.5.0"
+dav1d = "0.11.0"
