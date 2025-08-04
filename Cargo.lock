@@ -459,9 +459,9 @@ dependencies = [
 name = "bevy_av1"
 version = "0.1.0"
 dependencies = [
+ "async-channel",
  "bevy",
  "bitstream-io",
- "crossbeam-channel",
  "dav1d",
 ]
 

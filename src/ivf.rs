@@ -1,3 +1,4 @@
+use bevy::{asset::AsyncReadExt, tasks::futures_lite::AsyncRead};
 use bitstream_io::{ByteRead, ByteReader, LittleEndian};
 use std::io;
 
@@ -9,8 +10,10 @@ pub struct Header {
     pub timebase_den: u32,
 }
 
-pub fn read_header(r: &mut dyn io::Read) -> io::Result<Header> {
-    let mut br = ByteReader::endian(r, LittleEndian);
+pub async fn read_header<R: AsyncRead + Unpin>(r: &mut R) -> io::Result<Header> {
+    let mut header = [0u8; 44];
+    r.read_exact(&mut header).await?;
+    let mut br = ByteReader::endian(header.as_ref(), LittleEndian);
 
     const TAG: &[u8] = b"DKIF";
     const CODEC: &[u8] = b"AV01";
@@ -53,14 +56,15 @@ pub struct Packet {
     pub pts: u64,
 }
 
-pub fn read_packet(r: &mut dyn io::Read) -> io::Result<Packet> {
-    let mut br = ByteReader::endian(r, LittleEndian);
+pub async fn read_packet<R: AsyncRead + Unpin>(r: &mut R) -> io::Result<Packet> {
+    let mut header = [0u8; 12];
+    r.read_exact(&mut header).await?;
+    let mut br = ByteReader::endian(header.as_ref(), LittleEndian);
 
     let len = br.read::<u32>()?;
     let pts = br.read::<u64>()?;
     let mut buf = vec![0u8; len as usize];
-
-    br.read_bytes(&mut buf)?;
+    r.read_exact(&mut buf).await?;
 
     Ok(Packet { data: buf, pts })
 }

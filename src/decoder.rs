@@ -1,21 +1,22 @@
-use std::io::{BufReader, Read};
-
-use bevy::prelude::*;
+use bevy::{
+    prelude::*,
+    tasks::futures_lite::{AsyncRead, io::BufReader},
+};
 use dav1d::Picture;
 
 use crate::ivf;
 
 // Based on https://github.com/rust-av/dav1d-rs/blob/master/tools/src/main.rs
 
-pub struct Av1Decoder<R: Read> {
+pub struct Av1Decoder<R: AsyncRead + Unpin> {
     decoder: dav1d::Decoder,
-    tx: crossbeam_channel::Sender<Picture>,
+    tx: async_channel::Sender<Picture>,
     reader: BufReader<R>,
 }
 
-impl<R: Read> Av1Decoder<R> {
-    pub fn new(reader: R) -> Result<(Self, crossbeam_channel::Receiver<Picture>)> {
-        let (tx, rx) = crossbeam_channel::bounded(2);
+impl<R: AsyncRead + Unpin> Av1Decoder<R> {
+    pub fn new(reader: R) -> Result<(Self, async_channel::Receiver<Picture>)> {
+        let (tx, rx) = async_channel::bounded(2);
         Ok((
             Self {
                 decoder: dav1d::Decoder::new()?,
@@ -26,11 +27,11 @@ impl<R: Read> Av1Decoder<R> {
         ))
     }
 
-    pub fn play(&mut self) -> Result<()> {
-        let header = ivf::read_header(&mut self.reader)?;
+    pub async fn play(&mut self) -> Result<()> {
+        let header = ivf::read_header(&mut self.reader).await?;
         println!("{header:?}");
 
-        while let Ok(packet) = ivf::read_packet(&mut self.reader) {
+        while let Ok(packet) = ivf::read_packet(&mut self.reader).await {
             println!("Packet {}", packet.pts);
 
             // Send packet to the decoder
@@ -40,7 +41,7 @@ impl<R: Read> Av1Decoder<R> {
                     // pending pictures and send pending data to the decoder
                     // until it is all used up.
                     loop {
-                        self.handle_pending_pictures(false)?;
+                        self.handle_pending_pictures(false).await?;
 
                         match self.decoder.send_pending_data() {
                             Err(e) if e.is_again() => continue,
@@ -54,19 +55,19 @@ impl<R: Read> Av1Decoder<R> {
             }
 
             // Handle all pending pictures before sending the next data.
-            self.handle_pending_pictures(false)?;
+            self.handle_pending_pictures(false).await?;
         }
 
         // Handle all pending pictures that were not output yet.
-        self.handle_pending_pictures(true)?;
+        self.handle_pending_pictures(true).await?;
 
         Ok(())
     }
 
-    fn handle_pending_pictures(&mut self, drain: bool) -> Result<()> {
+    async fn handle_pending_pictures(&mut self, drain: bool) -> Result<()> {
         loop {
             match self.decoder.get_picture() {
-                Ok(p) => self.tx.send(p)?, // XXX handle SendError gracefully, just stop decoding?
+                Ok(p) => self.tx.send(p).await?, // XXX handle SendError gracefully, just stop decoding?
                 // Need to send more data to the decoder before it can decode new pictures
                 Err(e) if e.is_again() => return Ok(()),
                 Err(e) => {
