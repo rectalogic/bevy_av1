@@ -461,6 +461,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bitstream-io",
+ "crossbeam-channel",
  "dav1d",
 ]
 

@@ -3,7 +3,6 @@ use std::io;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Header {
-    pub tag: [u8; 4],
     pub w: u16,
     pub h: u16,
     pub timebase_num: u32,
@@ -13,13 +12,25 @@ pub struct Header {
 pub fn read_header(r: &mut dyn io::Read) -> io::Result<Header> {
     let mut br = ByteReader::endian(r, LittleEndian);
 
+    const TAG: &[u8] = b"DKIF";
+    const CODEC: &[u8] = b"AV01";
     let mut signature = [0u8; 4];
-    let mut tag = [0u8; 4];
 
     br.read_bytes(&mut signature)?;
-    let v0 = br.read::<u16>()?;
-    let v1 = br.read::<u16>()?;
-    br.read_bytes(&mut tag)?;
+    if signature != TAG {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid IVF tag",
+        ));
+    }
+    br.skip(4)?;
+    br.read_bytes(&mut signature)?;
+    if signature != CODEC {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "IVF does not contain AV1",
+        ));
+    }
 
     let w = br.read::<u16>()?;
     let h = br.read::<u16>()?;
@@ -27,11 +38,9 @@ pub fn read_header(r: &mut dyn io::Read) -> io::Result<Header> {
     let timebase_den = br.read::<u32>()?;
     let timebase_num = br.read::<u32>()?;
 
-    let _ = br.read::<u32>()?;
-    let _ = br.read::<u32>()?;
+    br.skip(8)?;
 
     Ok(Header {
-        tag,
         w,
         h,
         timebase_num,
@@ -40,7 +49,7 @@ pub fn read_header(r: &mut dyn io::Read) -> io::Result<Header> {
 }
 
 pub struct Packet {
-    pub data: Box<[u8]>,
+    pub data: Vec<u8>,
     pub pts: u64,
 }
 
@@ -53,8 +62,5 @@ pub fn read_packet(r: &mut dyn io::Read) -> io::Result<Packet> {
 
     br.read_bytes(&mut buf)?;
 
-    Ok(Packet {
-        data: buf.into_boxed_slice(),
-        pts,
-    })
+    Ok(Packet { data: buf, pts })
 }
