@@ -1,0 +1,89 @@
+use crate::av1;
+use async_trait::async_trait;
+use bevy::{
+    asset::{AssetLoader, LoadContext, io::Reader},
+    prelude::*,
+};
+use std::{io::Cursor, sync::Arc, time::Duration};
+
+#[derive(Asset, Debug, Clone, TypePath)]
+pub struct VideoSource {
+    pub bytes: Arc<[u8]>,
+}
+
+impl AsRef<[u8]> for VideoSource {
+    fn as_ref(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
+/// Loads files as [`VideoSource`] [`Assets`](bevy_asset::Assets)
+///
+/// This asset loader supports the AV1 video codec in an IVF container.
+#[derive(Default)]
+pub struct VideoLoader;
+
+impl AssetLoader for VideoLoader {
+    type Asset = VideoSource;
+    type Settings = ();
+    type Error = std::io::Error;
+
+    async fn load(
+        &self,
+        reader: &mut dyn Reader,
+        _settings: &Self::Settings,
+        _load_context: &mut LoadContext<'_>,
+    ) -> Result<VideoSource, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+        Ok(VideoSource {
+            bytes: bytes.into(),
+        })
+    }
+
+    fn extensions(&self) -> &[&str] {
+        &["ivf"]
+    }
+}
+
+pub struct VideoFrame {
+    pub image: Image,
+    pub pts: Duration,
+}
+
+#[async_trait]
+pub trait Decoder: Send {
+    fn width(&self) -> u32;
+    fn height(&self) -> u32;
+    async fn decode(&mut self, tx: async_channel::Sender<VideoFrame>) -> Result<()>;
+}
+
+pub trait Decodable: Send + Sync + 'static {
+    /// The type of the decoder of the video frames.
+    type Decoder: Decoder + Send;
+
+    /// Build and return a [`Self::Decoder`] of the implementing type
+    fn decoder(&self) -> Self::Decoder;
+}
+
+impl Decodable for VideoSource {
+    type Decoder = av1::Decoder<Cursor<VideoSource>>;
+
+    fn decoder(&self) -> Self::Decoder {
+        av1::Decoder::new(Cursor::new(self.clone())).unwrap()
+    }
+}
+
+/// A trait that allows adding a custom video source to the object.
+/// This is implemented for [`App`][bevy_app::App] to allow registering custom [`Decodable`] types.
+pub trait AddVideoSource {
+    /// Registers a video source.
+    /// The type must implement [`Decodable`],
+    /// so that it can be converted to a [`Decoder`] type,
+    /// and [`Asset`], so that it can be registered as an asset.
+    /// To use this method on [`App`][bevy_app::App],
+    /// the [video][super::VideoPlugin] and [asset][bevy_asset::AssetPlugin] plugins must be added first.
+    fn add_video_source<T>(&mut self) -> &mut Self
+    where
+        T: Decodable + Asset;
+}
