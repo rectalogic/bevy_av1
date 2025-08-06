@@ -11,27 +11,32 @@ use bevy::{
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 use bitstream_io::{ByteReader, LittleEndian};
+use std::result::Result;
 
-use crate::{av1::ivf, video_source::VideoFrame};
+use crate::{av1, video_source::VideoFrame};
 
 // Based on https://github.com/rust-av/dav1d-rs/blob/master/tools/src/main.rs
 
 pub struct Decoder<R: Read + Send> {
     decoder: dav1d::Decoder,
-    demuxer: ivf::Demuxer<R>,
+    demuxer: av1::ivf::Demuxer<R>,
 }
 
 impl<R: Read + Send> Decoder<R> {
-    pub fn new(reader: R) -> Result<Self> {
+    pub fn new(reader: R) -> Result<Self, av1::Error> {
         let mut settings = dav1d::Settings::new();
         settings.set_n_threads(1);
         Ok(Self {
-            decoder: dav1d::Decoder::with_settings(&settings)?,
-            demuxer: ivf::Demuxer::new(ByteReader::endian(reader, LittleEndian))?,
+            decoder: dav1d::Decoder::with_settings(&settings).map_err(av1::Error::Decoder)?,
+            demuxer: av1::ivf::Demuxer::new(ByteReader::endian(reader, LittleEndian))
+                .map_err(av1::Error::Demuxer)?,
         })
     }
 
-    pub async fn decode(&mut self, tx: async_channel::Sender<VideoFrame>) -> Result<()> {
+    pub async fn decode(
+        &mut self,
+        tx: async_channel::Sender<VideoFrame>,
+    ) -> Result<(), av1::Error> {
         while let Ok(packet) = self.demuxer.read_packet() {
             // Send packet to the decoder
             match self
@@ -47,12 +52,12 @@ impl<R: Read + Send> Decoder<R> {
 
                         match self.decoder.send_pending_data() {
                             Err(e) if e.is_again() => continue,
-                            Err(e) => return Err(e.into()),
+                            Err(e) => return Err(av1::Error::Decoder(e)),
                             _ => break,
                         }
                     }
                 }
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(av1::Error::Decoder(e)),
                 _ => (),
             }
 
@@ -70,7 +75,7 @@ impl<R: Read + Send> Decoder<R> {
         &mut self,
         tx: &async_channel::Sender<VideoFrame>,
         drain: bool,
-    ) -> Result<()> {
+    ) -> Result<(), av1::Error> {
         loop {
             match self.decoder.get_picture() {
                 Ok(p) => {
@@ -92,12 +97,14 @@ impl<R: Read + Send> Decoder<R> {
                         ),
                         timestamp: pts,
                     };
-                    tx.send(frame).await?; // XXX handle SendError gracefully, just stop decoding?
+                    tx.send(frame)
+                        .await
+                        .map_err(|_| av1::Error::ChannelClosed)?;
                 }
                 // Need to send more data to the decoder before it can decode new pictures
                 Err(e) if e.is_again() => return Ok(()),
                 Err(e) => {
-                    return Err(e.into());
+                    return Err(av1::Error::Decoder(e));
                 }
             }
 
@@ -108,10 +115,8 @@ impl<R: Read + Send> Decoder<R> {
         Ok(())
     }
 
-    fn yuv_to_bgr(&self, p: &dav1d::Picture) -> Result<Vec<u8>> {
-        if p.bit_depth() != 8 {
-            return Err(format!("Unsupported bit depth {}", p.bit_depth()).into());
-        }
+    fn yuv_to_bgr(&self, p: &dav1d::Picture) -> Result<Vec<u8>, av1::Error> {
+        assert!(p.bit_depth() == 8, "AV1 bit depth must be 8");
         let range = match p.color_range() {
             dav1d::pixel::YUVRange::Limited => YuvRange::Limited,
             dav1d::pixel::YUVRange::Full => YuvRange::Full,
@@ -136,7 +141,8 @@ impl<R: Read + Send> Decoder<R> {
                     width: p.width(),
                     height: p.height(),
                 };
-                yuv400_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
+                yuv400_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)
+                    .map_err(av1::Error::Conversion)?
             }
             layout => {
                 let yuv_data = YuvPlanarImage {
@@ -151,13 +157,16 @@ impl<R: Read + Send> Decoder<R> {
                 };
                 match layout {
                     dav1d::PixelLayout::I420 => {
-                        yuv420_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
+                        yuv420_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)
+                            .map_err(av1::Error::Conversion)?
                     }
                     dav1d::PixelLayout::I422 => {
-                        yuv422_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
+                        yuv422_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)
+                            .map_err(av1::Error::Conversion)?
                     }
                     dav1d::PixelLayout::I444 => {
-                        yuv444_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
+                        yuv444_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)
+                            .map_err(av1::Error::Conversion)?
                     }
                     dav1d::PixelLayout::I400 => {}
                 }
@@ -181,7 +190,11 @@ impl<R: Read + Send> crate::video_source::Decoder for Decoder<R> {
         self.demuxer.timebase()
     }
 
-    async fn decode(&mut self, tx: async_channel::Sender<VideoFrame>) -> Result<()> {
-        Decoder::decode(self, tx).await
+    async fn decode(&mut self, tx: async_channel::Sender<VideoFrame>) -> Result<(), BevyError> {
+        match Decoder::decode(self, tx).await {
+            Err(av1::Error::ChannelClosed) => Ok(()),
+            Err(e) => Err(e.into()),
+            Ok(_) => Ok(()),
+        }
     }
 }
