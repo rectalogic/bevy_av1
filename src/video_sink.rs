@@ -48,7 +48,17 @@ impl VideoSink {
                 Some(frame) => {
                     let start_timestamp = self.start_timestamp.get_or_insert(current_time);
                     let elapsed = current_time - *start_timestamp;
-                    if frame.timestamp + self.frame_duration < elapsed {
+                    dbg!(elapsed); //XXX
+                    dbg!(frame.timestamp); //XXX
+                    if elapsed == frame.timestamp {
+                        return Some(frame);
+                    } else if frame.timestamp > elapsed {
+                        if last_frame.is_some() {
+                            return last_frame;
+                        } else {
+                            return Some(frame);
+                        }
+                    } else if frame.timestamp + self.frame_duration < elapsed {
                         last_frame = Some(frame);
                         continue;
                     }

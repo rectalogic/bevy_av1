@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 use std::{io::Read, time::Duration};
-use yuv::{YuvPlanarImage, YuvRange, YuvStandardMatrix, yuv420_to_bgra};
+use yuv::{
+    YuvGrayImage, YuvPlanarImage, YuvRange, YuvStandardMatrix, yuv400_to_bgra, yuv420_to_bgra,
+    yuv422_to_bgra, yuv444_to_bgra,
+};
 
 use bevy::{
     asset::RenderAssetUsages,
@@ -69,41 +72,6 @@ impl<R: Read + Send> Decoder<R> {
         loop {
             match self.decoder.get_picture() {
                 Ok(p) => {
-                    if !matches!(p.pixel_layout(), dav1d::PixelLayout::I420) || !p.bit_depth() == 8
-                    {
-                        return Err("Only I420 bit depth 8 supported".into());
-                    }
-
-                    let mut bgra = vec![0; (p.width() * p.height() * 4) as usize];
-                    yuv420_to_bgra(
-                        &YuvPlanarImage {
-                            y_plane: &p.plane(dav1d::PlanarImageComponent::Y),
-                            y_stride: p.stride(dav1d::PlanarImageComponent::Y),
-                            u_plane: &p.plane(dav1d::PlanarImageComponent::U),
-                            u_stride: p.stride(dav1d::PlanarImageComponent::U),
-                            v_plane: &p.plane(dav1d::PlanarImageComponent::V),
-                            v_stride: p.stride(dav1d::PlanarImageComponent::V),
-                            width: p.width(),
-                            height: p.height(),
-                        },
-                        &mut bgra,
-                        p.width() * 4,
-                        match p.color_range() {
-                            dav1d::pixel::YUVRange::Limited => YuvRange::Limited,
-                            dav1d::pixel::YUVRange::Full => YuvRange::Full,
-                        },
-                        match p.matrix_coefficients() {
-                            dav1d::pixel::MatrixCoefficients::BT709 => YuvStandardMatrix::Bt709,
-                            dav1d::pixel::MatrixCoefficients::BT470BG
-                            | dav1d::pixel::MatrixCoefficients::ST170M => YuvStandardMatrix::Bt601,
-                            dav1d::pixel::MatrixCoefficients::ST240M => YuvStandardMatrix::Smpte240,
-                            dav1d::pixel::MatrixCoefficients::BT2020NonConstantLuminance
-                            | dav1d::pixel::MatrixCoefficients::BT2020ConstantLuminance => {
-                                YuvStandardMatrix::Bt2020
-                            }
-                            _ => YuvStandardMatrix::Bt709,
-                        },
-                    )?;
                     let pts = p.timestamp().unwrap();
                     let timebase = self.demuxer.timebase();
                     let timebase = timebase.0 as f64 / timebase.1 as f64;
@@ -116,7 +84,7 @@ impl<R: Read + Send> Decoder<R> {
                                 ..default()
                             },
                             TextureDimension::D2,
-                            bgra,
+                            self.yuv_to_bgr(&p)?,
                             TextureFormat::Bgra8Unorm,
                             RenderAssetUsages::default(),
                         ),
@@ -136,6 +104,64 @@ impl<R: Read + Send> Decoder<R> {
             }
         }
         Ok(())
+    }
+
+    fn yuv_to_bgr(&self, p: &dav1d::Picture) -> Result<Vec<u8>> {
+        if p.bit_depth() != 8 {
+            return Err(format!("Unsupported bit depth {}", p.bit_depth()).into());
+        }
+        let range = match p.color_range() {
+            dav1d::pixel::YUVRange::Limited => YuvRange::Limited,
+            dav1d::pixel::YUVRange::Full => YuvRange::Full,
+        };
+        let matrix = match p.matrix_coefficients() {
+            dav1d::pixel::MatrixCoefficients::BT709 => YuvStandardMatrix::Bt709,
+            dav1d::pixel::MatrixCoefficients::BT470BG
+            | dav1d::pixel::MatrixCoefficients::ST170M => YuvStandardMatrix::Bt601,
+            dav1d::pixel::MatrixCoefficients::ST240M => YuvStandardMatrix::Smpte240,
+            dav1d::pixel::MatrixCoefficients::BT2020NonConstantLuminance
+            | dav1d::pixel::MatrixCoefficients::BT2020ConstantLuminance => {
+                YuvStandardMatrix::Bt2020
+            }
+            _ => YuvStandardMatrix::Bt709,
+        };
+        let mut bgra_data = vec![0; (p.width() * p.height() * 4) as usize];
+        match p.pixel_layout() {
+            dav1d::PixelLayout::I400 => {
+                let yuv_data = YuvGrayImage {
+                    y_plane: &p.plane(dav1d::PlanarImageComponent::Y),
+                    y_stride: p.stride(dav1d::PlanarImageComponent::Y),
+                    width: p.width(),
+                    height: p.height(),
+                };
+                yuv400_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
+            }
+            layout => {
+                let yuv_data = YuvPlanarImage {
+                    y_plane: &p.plane(dav1d::PlanarImageComponent::Y),
+                    y_stride: p.stride(dav1d::PlanarImageComponent::Y),
+                    u_plane: &p.plane(dav1d::PlanarImageComponent::U),
+                    u_stride: p.stride(dav1d::PlanarImageComponent::U),
+                    v_plane: &p.plane(dav1d::PlanarImageComponent::V),
+                    v_stride: p.stride(dav1d::PlanarImageComponent::V),
+                    width: p.width(),
+                    height: p.height(),
+                };
+                match layout {
+                    dav1d::PixelLayout::I420 => {
+                        yuv420_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
+                    }
+                    dav1d::PixelLayout::I422 => {
+                        yuv422_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
+                    }
+                    dav1d::PixelLayout::I444 => {
+                        yuv444_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
+                    }
+                    dav1d::PixelLayout::I400 => {}
+                }
+            }
+        };
+        Ok(bgra_data)
     }
 }
 
