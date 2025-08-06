@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{
     prelude::*,
     tasks::{Task, block_on, futures_lite::future},
@@ -13,24 +15,47 @@ pub struct VideoSink {
     image: Handle<Image>,
     rx: async_channel::Receiver<VideoFrame>,
     task: Task<Result<()>>,
+    frame_duration: f64,
+    start_timestamp: Option<Duration>,
 }
 
 impl VideoSink {
     /// Create a new video sink.
     pub(crate) fn new(
         image: Handle<Image>,
+        timebase: (u32, u32),
         rx: async_channel::Receiver<VideoFrame>,
         task: Task<Result<()>>,
     ) -> Self {
-        Self { image, rx, task }
+        Self {
+            image,
+            frame_duration: timebase.0 as f64 / timebase.1 as f64,
+            rx,
+            task,
+            start_timestamp: None,
+        }
     }
 
     pub(crate) fn poll_task(&mut self) -> Option<Result<()>> {
         block_on(future::poll_once(&mut self.task))
     }
 
-    pub(crate) fn poll_frame(&mut self) -> Option<VideoFrame> {
-        self.rx.try_recv().ok()
+    pub(crate) fn next_frame(&mut self, current_time: Duration) -> Option<VideoFrame> {
+        //XXX set self.start_timestamp when we get our first frame, not here
+        let start_timestamp = self.start_timestamp.get_or_insert(current_time);
+        let elapsed = current_time - *start_timestamp;
+        loop {
+            match self.rx.try_recv().ok() {
+                None => return None,
+                Some(frame) => {
+                    let pts = frame.timestamp;
+                    if true {
+                        self.start_timestamp = Some(current_time);
+                        return Some(frame);
+                    }
+                }
+            }
+        }
     }
 
     pub fn image(&self) -> &Handle<Image> {

@@ -70,7 +70,7 @@ impl<R: Read + Send> Decoder<R> {
                 Ok(p) => {
                     let pts = p.timestamp().unwrap();
                     let timebase = self.demuxer.timebase();
-                    let timebase = timebase.1 as f64 / timebase.0 as f64;
+                    let timebase = timebase.0 as f64 / timebase.1 as f64;
                     let pts = Duration::from_secs_f64(pts as f64 * timebase);
                     let frame = VideoFrame {
                         image: Image::new(
@@ -112,6 +112,10 @@ impl<R: Read + Send> crate::video_source::Decoder for Decoder<R> {
 
     fn height(&self) -> u32 {
         self.demuxer.height() as u32
+    }
+
+    fn timebase(&self) -> (u32, u32) {
+        self.demuxer.timebase()
     }
 
     async fn decode(&mut self, tx: async_channel::Sender<VideoFrame>) -> Result<()> {

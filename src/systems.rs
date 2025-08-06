@@ -21,6 +21,7 @@ pub fn play_videos<Source: Asset + Decodable>(
             continue;
         };
         let mut decoder = video_source.decoder();
+        let timebase = decoder.timebase();
         let image = Image::new_uninit(
             Extent3d {
                 width: decoder.width(),
@@ -33,8 +34,7 @@ pub fn play_videos<Source: Asset + Decodable>(
         );
         let (tx, rx) = async_channel::bounded(2); //XXX what size channel? compare bevy framerate to decoder framerate?
         let task = ComputeTaskPool::get().spawn(async move { decoder.decode(tx).await });
-        let image_handle = images.add(image);
-        let sink = VideoSink::new(image_handle, rx, task);
+        let sink = VideoSink::new(images.add(image), timebase, rx, task);
         commands.entity(entity).insert(sink);
     }
 }
@@ -56,12 +56,14 @@ pub fn poll_video_sinks(
 pub fn render_video_sinks<Source: Asset + Decodable>(
     mut query_playing: Query<(Entity, &mut VideoSink, Option<&DrainVideoSink>)>,
     mut images: ResMut<Assets<Image>>,
+    time: Res<Time>,
     mut commands: Commands,
 ) {
     for (entity, mut sink, drain) in &mut query_playing {
-        let frame = sink.poll_frame();
-        match frame {
+        match sink.next_frame(time.elapsed()) {
             None => {
+                // If draining and no more frames, tear down
+                // XXX need a marker frame for final frame (or an enum containing frame), for proper draining and to handle looping
                 if drain.is_some() {
                     commands
                         .entity(entity)
@@ -71,8 +73,6 @@ pub fn render_video_sinks<Source: Asset + Decodable>(
             }
             Some(frame) => {
                 if let Some(image) = images.get_mut(sink.image()) {
-                    // XXX check timestamp and compare to current time/last frame etc.
-                    // XXX keep pulling images if needed - if draining need to bail like above (so move this up)
                     *image = frame.image;
                 }
             }

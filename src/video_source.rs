@@ -55,6 +55,7 @@ pub struct VideoFrame {
 pub trait Decoder: Send {
     fn width(&self) -> u32;
     fn height(&self) -> u32;
+    fn timebase(&self) -> (u32, u32);
     async fn decode(&mut self, tx: async_channel::Sender<VideoFrame>) -> Result<()>;
 }
 

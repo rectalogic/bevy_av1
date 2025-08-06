@@ -10,6 +10,7 @@ pub struct Demuxer<R: Read + Send> {
 struct Header {
     pub w: u16,
     pub h: u16,
+    pub frame_count: u32,
     pub timebase_num: u32,
     pub timebase_den: u32,
 }
@@ -63,12 +64,13 @@ impl<R: Read + Send> Demuxer<R> {
 
         let timebase_den = br.read::<u32>()?;
         let timebase_num = br.read::<u32>()?;
-
-        br.skip(8)?;
+        let frames = br.read::<u32>()?;
+        br.skip(4)?;
 
         Ok(Header {
             w,
             h,
+            frame_count: frames,
             timebase_num,
             timebase_den,
         })
