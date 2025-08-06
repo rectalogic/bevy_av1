@@ -1,6 +1,12 @@
-use bevy::{prelude::*, tasks::Task};
+use bevy::{
+    prelude::*,
+    tasks::{Task, block_on, futures_lite::future},
+};
 
 use crate::video_source::VideoFrame;
+
+#[derive(Component)]
+pub struct DrainVideoSink;
 
 #[derive(Component)]
 pub struct VideoSink {
@@ -17,6 +23,14 @@ impl VideoSink {
         task: Task<Result<()>>,
     ) -> Self {
         Self { image, rx, task }
+    }
+
+    pub(crate) fn poll_task(&mut self) -> Option<Result<()>> {
+        block_on(future::poll_once(&mut self.task))
+    }
+
+    pub(crate) fn poll_frame(&mut self) -> Option<VideoFrame> {
+        self.rx.try_recv().ok()
     }
 
     pub fn image(&self) -> &Handle<Image> {

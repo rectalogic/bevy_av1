@@ -1,8 +1,6 @@
-use std::io::Cursor;
-
 use crate::{
     video::VideoPlayer,
-    video_sink::VideoSink,
+    video_sink::{DrainVideoSink, VideoSink},
     video_source::{Decodable, Decoder},
 };
 use bevy::{
@@ -12,7 +10,7 @@ use bevy::{
     tasks::ComputeTaskPool,
 };
 
-pub fn play_video_system<Source: Asset + Decodable>(
+pub fn play_videos<Source: Asset + Decodable>(
     query_nonplaying: Query<(Entity, &VideoPlayer<Source>), Without<VideoSink>>,
     video_sources: Res<Assets<Source>>,
     mut images: ResMut<Assets<Image>>,
@@ -41,4 +39,43 @@ pub fn play_video_system<Source: Asset + Decodable>(
     }
 }
 
-//XXX add system to handle VideoSinks - poll the sink rx and copy frame into images
+pub fn poll_video_sinks(
+    mut query_playing: Query<(Entity, &mut VideoSink), Without<DrainVideoSink>>,
+    mut commands: Commands,
+) {
+    for (entity, mut sink) in &mut query_playing {
+        if let Some(result) = sink.poll_task() {
+            if let Err(err) = result {
+                warn!("Video decoding failed: {err}");
+            }
+            commands.entity(entity).insert(DrainVideoSink);
+        }
+    }
+}
+
+pub fn render_video_sinks<Source: Asset + Decodable>(
+    mut query_playing: Query<(Entity, &mut VideoSink, Option<&DrainVideoSink>)>,
+    mut images: ResMut<Assets<Image>>,
+    mut commands: Commands,
+) {
+    for (entity, mut sink, drain) in &mut query_playing {
+        let frame = sink.poll_frame();
+        match frame {
+            None => {
+                if drain.is_some() {
+                    commands
+                        .entity(entity)
+                        .remove::<(DrainVideoSink, VideoSink, VideoPlayer<Source>)>();
+                    continue;
+                }
+            }
+            Some(frame) => {
+                if let Some(image) = images.get_mut(sink.image()) {
+                    // XXX check timestamp and compare to current time/last frame etc.
+                    // XXX keep pulling images if needed - if draining need to bail like above (so move this up)
+                    *image = frame.image;
+                }
+            }
+        }
+    }
+}

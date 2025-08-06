@@ -80,11 +80,12 @@ impl<R: Read + Send> Decoder<R> {
                                 ..default()
                             },
                             TextureDimension::D2,
+                            //XXX do YUV conversion
                             p.plane(dav1d::PlanarImageComponent::Y).to_vec(),
                             TextureFormat::R8Unorm,
                             RenderAssetUsages::default(),
                         ),
-                        pts,
+                        timestamp: pts,
                     };
                     tx.send(frame).await?; // XXX handle SendError gracefully, just stop decoding?
                 }

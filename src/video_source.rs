@@ -48,7 +48,7 @@ impl AssetLoader for VideoLoader {
 
 pub struct VideoFrame {
     pub image: Image,
-    pub pts: Duration,
+    pub timestamp: Duration,
 }
 
 #[async_trait]
