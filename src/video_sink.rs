@@ -16,6 +16,7 @@ pub struct VideoSink {
     rx: async_channel::Receiver<VideoFrame>,
     task: Task<Result<()>>,
     frame_duration: Duration,
+    last_frame: Option<VideoFrame>,
     start_timestamp: Option<Duration>,
 }
 
@@ -32,6 +33,7 @@ impl VideoSink {
             frame_duration: Duration::from_secs_f64(timebase.0 as f64 / timebase.1 as f64),
             rx,
             task,
+            last_frame: None,
             start_timestamp: None,
         }
     }
@@ -41,31 +43,55 @@ impl VideoSink {
     }
 
     pub(crate) fn next_frame(&mut self, current_time: Duration) -> Option<VideoFrame> {
-        let mut last_frame = None;
-        loop {
-            match self.rx.try_recv().ok() {
-                None => return last_frame,
-                Some(frame) => {
-                    let start_timestamp = self.start_timestamp.get_or_insert(current_time);
-                    let elapsed = current_time - *start_timestamp;
-                    dbg!(elapsed); //XXX
-                    dbg!(frame.timestamp); //XXX
-                    if elapsed == frame.timestamp {
-                        return Some(frame);
-                    } else if frame.timestamp > elapsed {
-                        if last_frame.is_some() {
-                            return last_frame;
-                        } else {
-                            return Some(frame);
-                        }
-                    } else if frame.timestamp + self.frame_duration < elapsed {
-                        last_frame = Some(frame);
-                        continue;
-                    }
-                    return Some(frame);
-                }
+        let start_timestamp = self.start_timestamp.get_or_insert(current_time);
+        let elapsed = current_time - *start_timestamp;
+        let timing_tolerance = self.frame_duration / 2;
+
+        // First, check if we have a stored frame that's now appropriate
+        if let Some(ref frame) = self.last_frame {
+            if frame.timestamp <= elapsed + timing_tolerance
+                && frame.timestamp + timing_tolerance >= elapsed
+            {
+                // This stored frame is now appropriate to display
+                return self.last_frame.take();
+            } else if frame.timestamp + timing_tolerance < elapsed {
+                // Stored frame is now too old, discard it
+                self.last_frame = None;
+            } else {
+                // Stored frame is still in the future, wait for it
+                return None;
             }
         }
+
+        // Process new frames from the channel
+        while let Ok(frame) = self.rx.try_recv() {
+            // Frame is too old - skip it
+            if frame.timestamp + timing_tolerance < elapsed {
+                continue;
+            }
+
+            // Frame is current - display it now
+            if frame.timestamp <= elapsed + timing_tolerance {
+                return Some(frame);
+            }
+
+            // Frame is in the future - store it for later
+            if self.last_frame.is_none()
+                || frame.timestamp < self.last_frame.as_ref().unwrap().timestamp
+            {
+                self.last_frame = Some(frame);
+            }
+        }
+
+        // If we still have a stored frame and no current frame was found,
+        // check if the stored frame is close enough to display
+        if let Some(frame) = &self.last_frame {
+            if frame.timestamp <= elapsed + self.frame_duration {
+                return self.last_frame.take();
+            }
+        }
+
+        None
     }
 
     pub fn image(&self) -> &Handle<Image> {

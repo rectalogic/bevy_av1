@@ -32,7 +32,7 @@ pub fn play_videos<Source: Asset + Decodable>(
             TextureFormat::Rgba8Unorm,
             RenderAssetUsages::default(),
         );
-        let (tx, rx) = async_channel::bounded(1); //XXX what size channel? compare bevy framerate to decoder framerate?
+        let (tx, rx) = async_channel::bounded(2); //XXX make configurable?
         let task = ComputeTaskPool::get().spawn(async move { decoder.decode(tx).await });
         let sink = VideoSink::new(images.add(image), timebase, rx, task);
         commands.entity(entity).insert(sink);

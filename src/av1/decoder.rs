@@ -23,8 +23,10 @@ pub struct Decoder<R: Read + Send> {
 
 impl<R: Read + Send> Decoder<R> {
     pub fn new(reader: R) -> Result<Self> {
+        let mut settings = dav1d::Settings::new();
+        settings.set_n_threads(1);
         Ok(Self {
-            decoder: dav1d::Decoder::new()?, //XXX configure # threads?
+            decoder: dav1d::Decoder::with_settings(&settings)?,
             demuxer: ivf::Demuxer::new(ByteReader::endian(reader, LittleEndian))?,
         })
     }
