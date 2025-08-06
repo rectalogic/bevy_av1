@@ -475,6 +475,7 @@ dependencies = [
  "bevy",
  "bitstream-io",
  "dav1d",
+ "yuv",
 ]
 
 [[package]]
@@ -5277,6 +5278,15 @@ name = "yazi"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e01738255b5a16e78bbb83e7fbba0a1e7dd506905cfc53f4622d89015a03fbb5"
+
+[[package]]
+name = "yuv"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b08262a503468e0123115a872ac2fd250f965e0178489d393686e9dd19b47e6"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "zeno"

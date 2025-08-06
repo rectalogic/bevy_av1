@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use std::{io::Read, time::Duration};
+use yuv::{YuvPlanarImage, YuvRange, YuvStandardMatrix, yuv420_to_bgra};
 
 use bevy::{
     asset::RenderAssetUsages,
@@ -68,6 +69,41 @@ impl<R: Read + Send> Decoder<R> {
         loop {
             match self.decoder.get_picture() {
                 Ok(p) => {
+                    if !matches!(p.pixel_layout(), dav1d::PixelLayout::I420) || !p.bit_depth() == 8
+                    {
+                        return Err("Only I420 bit depth 8 supported".into());
+                    }
+
+                    let mut bgra = vec![0; (p.width() * p.height() * 4) as usize];
+                    yuv420_to_bgra(
+                        &YuvPlanarImage {
+                            y_plane: &p.plane(dav1d::PlanarImageComponent::Y),
+                            y_stride: p.stride(dav1d::PlanarImageComponent::Y),
+                            u_plane: &p.plane(dav1d::PlanarImageComponent::U),
+                            u_stride: p.stride(dav1d::PlanarImageComponent::U),
+                            v_plane: &p.plane(dav1d::PlanarImageComponent::V),
+                            v_stride: p.stride(dav1d::PlanarImageComponent::V),
+                            width: p.width(),
+                            height: p.height(),
+                        },
+                        &mut bgra,
+                        p.width() * 4,
+                        match p.color_range() {
+                            dav1d::pixel::YUVRange::Limited => YuvRange::Limited,
+                            dav1d::pixel::YUVRange::Full => YuvRange::Full,
+                        },
+                        match p.matrix_coefficients() {
+                            dav1d::pixel::MatrixCoefficients::BT709 => YuvStandardMatrix::Bt709,
+                            dav1d::pixel::MatrixCoefficients::BT470BG
+                            | dav1d::pixel::MatrixCoefficients::ST170M => YuvStandardMatrix::Bt601,
+                            dav1d::pixel::MatrixCoefficients::ST240M => YuvStandardMatrix::Smpte240,
+                            dav1d::pixel::MatrixCoefficients::BT2020NonConstantLuminance
+                            | dav1d::pixel::MatrixCoefficients::BT2020ConstantLuminance => {
+                                YuvStandardMatrix::Bt2020
+                            }
+                            _ => YuvStandardMatrix::Bt709,
+                        },
+                    )?;
                     let pts = p.timestamp().unwrap();
                     let timebase = self.demuxer.timebase();
                     let timebase = timebase.0 as f64 / timebase.1 as f64;
@@ -80,9 +116,8 @@ impl<R: Read + Send> Decoder<R> {
                                 ..default()
                             },
                             TextureDimension::D2,
-                            //XXX do YUV conversion
-                            p.plane(dav1d::PlanarImageComponent::Y).to_vec(),
-                            TextureFormat::R8Unorm,
+                            bgra,
+                            TextureFormat::Bgra8Unorm,
                             RenderAssetUsages::default(),
                         ),
                         timestamp: pts,

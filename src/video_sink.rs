@@ -15,7 +15,7 @@ pub struct VideoSink {
     image: Handle<Image>,
     rx: async_channel::Receiver<VideoFrame>,
     task: Task<Result<()>>,
-    frame_duration: f64,
+    frame_duration: Duration,
     start_timestamp: Option<Duration>,
 }
 
@@ -29,7 +29,7 @@ impl VideoSink {
     ) -> Self {
         Self {
             image,
-            frame_duration: timebase.0 as f64 / timebase.1 as f64,
+            frame_duration: Duration::from_secs_f64(timebase.0 as f64 / timebase.1 as f64),
             rx,
             task,
             start_timestamp: None,
@@ -41,18 +41,18 @@ impl VideoSink {
     }
 
     pub(crate) fn next_frame(&mut self, current_time: Duration) -> Option<VideoFrame> {
-        //XXX set self.start_timestamp when we get our first frame, not here
-        let start_timestamp = self.start_timestamp.get_or_insert(current_time);
-        let elapsed = current_time - *start_timestamp;
+        let mut last_frame = None;
         loop {
             match self.rx.try_recv().ok() {
-                None => return None,
+                None => return last_frame,
                 Some(frame) => {
-                    let pts = frame.timestamp;
-                    if true {
-                        self.start_timestamp = Some(current_time);
-                        return Some(frame);
+                    let start_timestamp = self.start_timestamp.get_or_insert(current_time);
+                    let elapsed = current_time - *start_timestamp;
+                    if frame.timestamp + self.frame_duration < elapsed {
+                        last_frame = Some(frame);
+                        continue;
                     }
+                    return Some(frame);
                 }
             }
         }
