@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use std::{io::Read, time::Duration};
 use yuv::{
     YuvGrayImage, YuvPlanarImage, YuvRange, YuvStandardMatrix, yuv400_to_bgra, yuv420_to_bgra,
@@ -176,7 +175,6 @@ impl<R: Read + Send> Decoder<R> {
     }
 }
 
-#[async_trait]
 impl<R: Read + Send> crate::video_source::Decoder for Decoder<R> {
     fn width(&self) -> u32 {
         self.demuxer.width() as u32

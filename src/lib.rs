@@ -10,12 +10,13 @@ mod systems;
 mod video;
 mod video_sink;
 mod video_source;
-
 pub use crate::{
     video::VideoPlayer,
     video_sink::VideoSink,
-    video_source::{Decodable, VideoSource},
+    video_source::{Decodable, Decoder, VideoFrame, VideoSource},
 };
+#[doc(no_inline)]
+pub use async_channel::Sender;
 
 pub struct VideoPlugin;
 

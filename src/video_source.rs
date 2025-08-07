@@ -1,5 +1,4 @@
 use crate::av1;
-use async_trait::async_trait;
 use bevy::{
     asset::{AssetLoader, LoadContext, io::Reader},
     prelude::*,
@@ -51,12 +50,14 @@ pub struct VideoFrame {
     pub timestamp: Duration,
 }
 
-#[async_trait]
 pub trait Decoder: Send {
     fn width(&self) -> u32;
     fn height(&self) -> u32;
     fn timebase(&self) -> (u32, u32);
-    async fn decode(&mut self, tx: async_channel::Sender<VideoFrame>) -> Result<()>;
+    fn decode(
+        &mut self,
+        tx: async_channel::Sender<VideoFrame>,
+    ) -> impl Future<Output = Result<()>> + Send;
 }
 
 pub trait Decodable: Send + Sync + 'static {
