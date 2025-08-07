@@ -21,7 +21,7 @@ fn main() {
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn(VideoPlayer::new(
-            asset_server.load("av1/cosmos-laundromat-24fps.ivf"),
+            asset_server.load("av1/cosmos-laundromat.ivf"),
         ))
         .observe(
             |trigger: Trigger<OnAdd, VideoSink>,

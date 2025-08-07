@@ -29,7 +29,7 @@ fn setup(
     commands.spawn((Camera3d::default(), Transform::from_xyz(0.0, 0.0, 2.0)));
     commands
         .spawn((
-            VideoPlayer::new(asset_server.load("av1/cosmos-laundromat-24fps.ivf")),
+            VideoPlayer::new(asset_server.load("av1/cosmos-laundromat.ivf")),
             Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
             MeshMaterial3d(materials.add(StandardMaterial::default())),
         ))
