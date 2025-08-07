@@ -22,19 +22,21 @@ pub fn play_videos<Source: Asset + Decodable>(
         };
         let mut decoder = video_source.decoder();
         let timebase = decoder.timebase();
+        let width = decoder.width();
+        let height = decoder.height();
         let image = Image::new_uninit(
             Extent3d {
-                width: decoder.width(),
-                height: decoder.height(),
+                width,
+                height,
                 ..default()
             },
             TextureDimension::D2,
             TextureFormat::Rgba8Unorm,
             RenderAssetUsages::default(),
         );
-        let (tx, rx) = async_channel::bounded(2); //XXX make configurable?
+        let (tx, rx) = async_channel::bounded(1); //XXX make configurable?
         let task = ComputeTaskPool::get().spawn(async move { decoder.decode(tx).await });
-        let sink = VideoSink::new(images.add(image), timebase, rx, task);
+        let sink = VideoSink::new(images.add(image), timebase, width, height, rx, task);
         commands.entity(entity).insert(sink);
     }
 }

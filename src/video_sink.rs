@@ -15,6 +15,8 @@ pub struct VideoSink {
     image: Handle<Image>,
     rx: async_channel::Receiver<VideoFrame>,
     task: Task<Result<()>>,
+    width: u32,
+    height: u32,
     frame_duration: Duration,
     last_frame: Option<VideoFrame>,
     start_timestamp: Option<Duration>,
@@ -25,6 +27,8 @@ impl VideoSink {
     pub(crate) fn new(
         image: Handle<Image>,
         timebase: (u32, u32),
+        width: u32,
+        height: u32,
         rx: async_channel::Receiver<VideoFrame>,
         task: Task<Result<()>>,
     ) -> Self {
@@ -33,6 +37,8 @@ impl VideoSink {
             frame_duration: Duration::from_secs_f64(timebase.0 as f64 / timebase.1 as f64),
             rx,
             task,
+            width,
+            height,
             last_frame: None,
             start_timestamp: None,
         }
@@ -92,6 +98,14 @@ impl VideoSink {
         }
 
         None
+    }
+
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
     }
 
     pub fn image(&self) -> &Handle<Image> {

@@ -91,7 +91,7 @@ impl<R: Read + Send> Decoder<R> {
                             },
                             TextureDimension::D2,
                             self.yuv_to_bgr(&p)?,
-                            TextureFormat::Bgra8Unorm,
+                            TextureFormat::Bgra8UnormSrgb, //XXX Bgra8Unorm or Bgra8UnormSrgb
                             RenderAssetUsages::default(),
                         ),
                         timestamp: pts,
@@ -129,7 +129,7 @@ impl<R: Read + Send> Decoder<R> {
             | dav1d::pixel::MatrixCoefficients::BT2020ConstantLuminance => {
                 YuvStandardMatrix::Bt2020
             }
-            _ => YuvStandardMatrix::Bt709,
+            _ => YuvStandardMatrix::Bt601,
         };
         let mut bgra_data = vec![0; (p.width() * p.height() * 4) as usize];
         match p.pixel_layout() {

@@ -45,6 +45,7 @@ impl AssetLoader for VideoLoader {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct VideoFrame {
     pub image: Image,
     pub timestamp: Duration,

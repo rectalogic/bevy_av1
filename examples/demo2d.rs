@@ -6,7 +6,7 @@ fn main() {
     app.add_plugins((
         DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: WindowResolution::new(1280.0, 720.0),
+                resolution: WindowResolution::new(1718.0, 720.0),
                 ..default()
             }),
             ..default()
@@ -21,7 +21,7 @@ fn main() {
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn(VideoPlayer::new(
-            asset_server.load("av1/Johnny_1280x720.ivf"),
+            asset_server.load("av1/cosmos-laundromat-24fps.ivf"),
         ))
         .observe(
             |trigger: Trigger<OnAdd, VideoSink>,
