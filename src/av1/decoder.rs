@@ -1,4 +1,7 @@
-use std::{io::Read, time::Duration};
+use std::{
+    io::{Read, Seek},
+    time::Duration,
+};
 use yuv::{
     YuvGrayImage, YuvPlanarImage, YuvRange, YuvStandardMatrix, yuv400_to_bgra, yuv420_to_bgra,
     yuv422_to_bgra, yuv444_to_bgra,
@@ -16,12 +19,12 @@ use crate::{av1, video_source::VideoFrame};
 
 // Based on https://github.com/rust-av/dav1d-rs/blob/master/tools/src/main.rs
 
-pub struct Decoder<R: Read + Send> {
+pub struct Decoder<R: Read + Seek + Send> {
     decoder: dav1d::Decoder,
     demuxer: av1::ivf::Demuxer<R>,
 }
 
-impl<R: Read + Send> Decoder<R> {
+impl<R: Read + Seek + Send> Decoder<R> {
     pub fn new(reader: R) -> Result<Self, av1::Error> {
         let mut settings = dav1d::Settings::new();
         settings.set_n_threads(1);
@@ -175,7 +178,7 @@ impl<R: Read + Send> Decoder<R> {
     }
 }
 
-impl<R: Read + Send> crate::video_source::Decoder for Decoder<R> {
+impl<R: Read + Seek + Send> crate::video_source::Decoder for Decoder<R> {
     fn width(&self) -> u32 {
         self.demuxer.width() as u32
     }
