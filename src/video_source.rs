@@ -1,10 +1,12 @@
-use crate::decodable::Decodable;
+use crate::{av1, decodable::Decodable};
 use bevy::{
     asset::{AssetLoader, LoadContext, io::Reader},
     prelude::*,
 };
+use std::io::Cursor;
 use std::sync::Arc;
 
+/// A source of video data.
 #[derive(Asset, Debug, Clone, TypePath)]
 pub struct VideoSource {
     pub bytes: Arc<[u8]>,
@@ -13,6 +15,14 @@ pub struct VideoSource {
 impl AsRef<[u8]> for VideoSource {
     fn as_ref(&self) -> &[u8] {
         &self.bytes
+    }
+}
+
+impl Decodable for VideoSource {
+    type Decoder = av1::Decoder<Cursor<VideoSource>>;
+
+    fn decoder(&self) -> Self::Decoder {
+        av1::Decoder::new(Cursor::new(self.clone())).unwrap()
     }
 }
 

@@ -10,6 +10,14 @@ use crate::decodable::VideoFrame;
 #[derive(Component)]
 pub struct DrainVideoSink;
 
+/// Bevy inserts this component onto your entities when it begins playing a video source.
+/// Use [`VideoPlayer`][crate::VideoPlayer] to trigger that to happen.
+///
+/// You can use this component to access the texture that renders video frames.
+///
+/// If this component is removed from an entity, and a [`VideoSource`][crate::VideoSource] is
+/// attached to that entity, that [`VideoSource`][crate::VideoSource] will start playing. If
+/// that source is unchanged, that translates to the video restarting.
 #[derive(Component)]
 pub struct VideoSink {
     image: Handle<Image>,
@@ -80,14 +88,18 @@ impl VideoSink {
         None
     }
 
+    /// Width of a video frame.
     pub fn width(&self) -> u32 {
         self.width
     }
 
+    /// Height of a video frame.
     pub fn height(&self) -> u32 {
         self.height
     }
 
+    /// The texture handle that video frames are rendered into.
+    /// Apply this to a material or sprite to make the video visible.
     pub fn image(&self) -> &Handle<Image> {
         &self.image
     }
