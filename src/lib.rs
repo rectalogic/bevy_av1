@@ -12,11 +12,11 @@ pub use crate::{
     decodable::{Decodable, Decoder, VideoFrame},
     video::{PlaybackMode, VideoPlayer},
     video_sink::VideoSink,
-    video_source::VideoSource,
+    video_source::{AddVideoSource, VideoSource},
 };
 use crate::{
     systems::{play_videos, poll_video_sinks, render_video_sinks},
-    video_source::{AddVideoSource, VideoLoader},
+    video_source::VideoLoader,
 };
 #[doc(no_inline)]
 pub use async_channel::Sender;
