@@ -12,12 +12,14 @@ use crate::{decodable::Decodable, video_source::VideoSource};
 /// When Bevy begins the video playback, a [`VideoSink`][crate::VideoSink] component will be
 /// added to the entity. You can use that component to access the video dimensions and texture image.
 ///
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Default)]
 pub struct VideoPlayer<Source = VideoSource>
 where
     Source: Asset + Decodable,
 {
+    /// The decodable video source [`Asset`].
     pub source: Handle<Source>,
+    /// The video playback mode.
     pub mode: PlaybackMode,
 }
 
@@ -33,12 +35,13 @@ impl VideoPlayer<VideoSource> {
 }
 
 /// The way Bevy manages the video playback.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 pub enum PlaybackMode {
     /// Repeat the video forever.
     Loop,
     /// Despawn the entity and its children when the video finishes playing.
     Despawn,
     /// Remove the video components from the entity, when the video finishes playing.
+    #[default]
     Remove,
 }

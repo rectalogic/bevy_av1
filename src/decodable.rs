@@ -35,7 +35,7 @@ pub trait Decoder: Send {
 ///
 /// It must be [`Send`] and [`Sync`] in order to be registered.
 /// Types that implement this trait usually contain raw video data that can be decoded into a series of [`crate::VideoFrame`].
-/// This trait is implemented for [`VideoSource`].
+/// This trait is implemented for [`crate::VideoSource`].
 pub trait Decodable: Send + Sync + 'static {
     /// The type of the decoder of the video frames.
     type Decoder: Decoder + Send;

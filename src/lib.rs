@@ -1,3 +1,5 @@
+//! Video support for the game engine Bevy
+
 use bevy::prelude::*;
 
 mod av1;
@@ -19,6 +21,9 @@ use crate::{
 #[doc(no_inline)]
 pub use async_channel::Sender;
 
+/// Adds support for video playback to a Bevy Application
+///
+/// Insert an [`VideoPlayer`] onto your entities to play video.
 pub struct VideoPlugin;
 
 impl Plugin for VideoPlugin {
