@@ -1,5 +1,7 @@
 use bitstream_io::{ByteRead, ByteReader, LittleEndian};
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
+
+pub const HEADER_SIZE: u64 = 32;
 
 pub struct Demuxer<R: Read + Send> {
     reader: ByteReader<R, LittleEndian>,
@@ -20,8 +22,9 @@ pub struct Packet {
     pub pts: u64,
 }
 
-impl<R: Read + Send> Demuxer<R> {
-    pub fn new(mut reader: ByteReader<R, LittleEndian>) -> io::Result<Self> {
+impl<R: Read + Seek + Send> Demuxer<R> {
+    pub fn new(reader: R) -> io::Result<Self> {
+        let mut reader = ByteReader::endian(reader, LittleEndian);
         let header = Self::read_header(&mut reader)?;
         Ok(Self { reader, header })
     }
@@ -83,5 +86,10 @@ impl<R: Read + Send> Demuxer<R> {
         self.reader.read_bytes(&mut buf)?;
 
         Ok(Packet { data: buf, pts })
+    }
+
+    pub fn reset(&mut self) -> io::Result<()> {
+        self.reader.reader().seek(SeekFrom::Start(HEADER_SIZE))?;
+        Ok(())
     }
 }

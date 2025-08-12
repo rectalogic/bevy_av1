@@ -58,6 +58,7 @@ pub trait Decoder: Send {
     fn decode(
         &mut self,
         tx: async_channel::Sender<VideoFrame>,
+        loop_: bool,
     ) -> impl Future<Output = Result<()>> + Send;
 }
 

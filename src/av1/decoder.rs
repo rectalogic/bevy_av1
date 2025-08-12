@@ -12,7 +12,6 @@ use bevy::{
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
-use bitstream_io::{ByteReader, LittleEndian};
 use std::result::Result;
 
 use crate::{av1, video_source::VideoFrame};
@@ -30,46 +29,53 @@ impl<R: Read + Seek + Send> Decoder<R> {
         settings.set_n_threads(1);
         Ok(Self {
             decoder: dav1d::Decoder::with_settings(&settings).map_err(av1::Error::Decoder)?,
-            demuxer: av1::ivf::Demuxer::new(ByteReader::endian(reader, LittleEndian))
-                .map_err(av1::Error::Demuxer)?,
+            demuxer: av1::ivf::Demuxer::new(reader).map_err(av1::Error::Demuxer)?,
         })
     }
 
     pub async fn decode(
         &mut self,
         tx: async_channel::Sender<VideoFrame>,
+        loop_: bool,
     ) -> Result<(), av1::Error> {
-        while let Ok(packet) = self.demuxer.read_packet() {
-            // Send packet to the decoder
-            match self
-                .decoder
-                .send_data(packet.data, None, Some(packet.pts as i64), None)
-            {
-                Err(e) if e.is_again() => {
-                    // If the decoder did not consume all data, output all
-                    // pending pictures and send pending data to the decoder
-                    // until it is all used up.
-                    loop {
-                        self.handle_pending_pictures(&tx, false).await?;
+        loop {
+            while let Ok(packet) = self.demuxer.read_packet() {
+                // Send packet to the decoder
+                match self
+                    .decoder
+                    .send_data(packet.data, None, Some(packet.pts as i64), None)
+                {
+                    Err(e) if e.is_again() => {
+                        // If the decoder did not consume all data, output all
+                        // pending pictures and send pending data to the decoder
+                        // until it is all used up.
+                        loop {
+                            self.handle_pending_pictures(&tx, false).await?;
 
-                        match self.decoder.send_pending_data() {
-                            Err(e) if e.is_again() => continue,
-                            Err(e) => return Err(av1::Error::Decoder(e)),
-                            _ => break,
+                            match self.decoder.send_pending_data() {
+                                Err(e) if e.is_again() => continue,
+                                Err(e) => return Err(av1::Error::Decoder(e)),
+                                _ => break,
+                            }
                         }
                     }
+                    Err(e) => return Err(av1::Error::Decoder(e)),
+                    _ => (),
                 }
-                Err(e) => return Err(av1::Error::Decoder(e)),
-                _ => (),
+
+                // Handle all pending pictures before sending the next data.
+                self.handle_pending_pictures(&tx, false).await?;
             }
 
-            // Handle all pending pictures before sending the next data.
-            self.handle_pending_pictures(&tx, false).await?;
+            // Handle all pending pictures that were not output yet.
+            self.handle_pending_pictures(&tx, true).await?;
+
+            if loop_ {
+                self.demuxer.reset().map_err(av1::Error::Demuxer)?;
+            } else {
+                break;
+            }
         }
-
-        // Handle all pending pictures that were not output yet.
-        self.handle_pending_pictures(&tx, true).await?;
-
         Ok(())
     }
 
@@ -191,8 +197,12 @@ impl<R: Read + Seek + Send> crate::video_source::Decoder for Decoder<R> {
         self.demuxer.timebase()
     }
 
-    async fn decode(&mut self, tx: async_channel::Sender<VideoFrame>) -> Result<(), BevyError> {
-        match Decoder::decode(self, tx).await {
+    async fn decode(
+        &mut self,
+        tx: async_channel::Sender<VideoFrame>,
+        loop_: bool,
+    ) -> Result<(), BevyError> {
+        match Decoder::decode(self, tx, loop_).await {
             Err(av1::Error::ChannelClosed) => Ok(()),
             Err(e) => Err(e.into()),
             Ok(_) => Ok(()),

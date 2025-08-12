@@ -1,4 +1,5 @@
 use crate::{
+    PlaybackMode,
     video::VideoPlayer,
     video_sink::{DrainVideoSink, VideoSink},
     video_source::{Decodable, Decoder},
@@ -16,8 +17,8 @@ pub fn play_videos<Source: Asset + Decodable>(
     mut images: ResMut<Assets<Image>>,
     mut commands: Commands,
 ) {
-    for (entity, source_handle) in &query_nonplaying {
-        let Some(video_source) = video_sources.get(&source_handle.0) else {
+    for (entity, player) in &query_nonplaying {
+        let Some(video_source) = video_sources.get(&player.source) else {
             continue;
         };
         let mut decoder = video_source.decoder();
@@ -34,8 +35,9 @@ pub fn play_videos<Source: Asset + Decodable>(
             TextureFormat::Rgba8Unorm,
             RenderAssetUsages::default(),
         );
+        let loop_ = matches!(player.mode, PlaybackMode::Loop);
         let (tx, rx) = async_channel::bounded(1); //XXX make configurable?
-        let task = ComputeTaskPool::get().spawn(async move { decoder.decode(tx).await });
+        let task = ComputeTaskPool::get().spawn(async move { decoder.decode(tx, loop_).await });
         let sink = VideoSink::new(images.add(image), timebase, width, height, rx, task);
         commands.entity(entity).insert(sink);
     }
@@ -56,20 +58,34 @@ pub fn poll_video_sinks(
 }
 
 pub fn render_video_sinks<Source: Asset + Decodable>(
-    mut query_playing: Query<(Entity, &mut VideoSink, Option<&DrainVideoSink>)>,
+    mut query_playing: Query<(
+        Entity,
+        &mut VideoSink,
+        &VideoPlayer<Source>,
+        Option<&DrainVideoSink>,
+    )>,
     mut images: ResMut<Assets<Image>>,
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    for (entity, mut sink, drain) in &mut query_playing {
+    for (entity, mut sink, player, drain) in &mut query_playing {
         match sink.next_frame(time.elapsed()) {
             None => {
                 // If draining and no more frames, tear down
-                // XXX need a marker frame for final frame (or an enum containing frame), for proper draining and to handle looping
                 if drain.is_some() {
-                    commands
-                        .entity(entity)
-                        .remove::<(DrainVideoSink, VideoSink, VideoPlayer<Source>)>();
+                    match player.mode {
+                        PlaybackMode::Remove => {
+                            commands
+                                .entity(entity)
+                                .remove::<(DrainVideoSink, VideoSink, VideoPlayer<Source>)>();
+                        }
+                        PlaybackMode::Despawn => {
+                            commands.entity(entity).despawn();
+                        }
+                        PlaybackMode::Loop => {
+                            commands.entity(entity).remove::<DrainVideoSink>();
+                        }
+                    }
                     continue;
                 }
             }

@@ -11,7 +11,7 @@ mod video;
 mod video_sink;
 mod video_source;
 pub use crate::{
-    video::VideoPlayer,
+    video::{PlaybackMode, VideoPlayer},
     video_sink::VideoSink,
     video_source::{Decodable, Decoder, VideoFrame, VideoSource},
 };

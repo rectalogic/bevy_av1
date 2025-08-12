@@ -49,16 +49,22 @@ impl VideoSink {
     }
 
     fn fetch_frame(&mut self) -> Option<VideoFrame> {
-        if self.buffered_frame.is_some() {
-            return self.buffered_frame.take();
+        let frame = match self.buffered_frame.take() {
+            Some(frame) => frame,
+            None => self.rx.try_recv().ok()?,
+        };
+        // Support looping
+        if frame.timestamp == Duration::ZERO {
+            self.start_timestamp = None;
         }
-        self.rx.try_recv().ok()
+        Some(frame)
     }
 
     pub(crate) fn next_frame(&mut self, current_time: Duration) -> Option<VideoFrame> {
-        let start_timestamp = self.start_timestamp.get_or_insert(current_time);
-        let elapsed = current_time - *start_timestamp;
         while let Some(frame) = self.fetch_frame() {
+            let start_timestamp = self.start_timestamp.get_or_insert(current_time);
+            let elapsed = current_time - *start_timestamp;
+
             // Frame in the future
             if frame.timestamp > elapsed + self.frame_duration {
                 self.buffered_frame = Some(frame);
@@ -86,5 +92,3 @@ impl VideoSink {
         &self.image
     }
 }
-
-// XXX add and implement VideoSinkPlayback trait with pause() etc.

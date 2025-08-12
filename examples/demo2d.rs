@@ -1,5 +1,5 @@
 use bevy::{prelude::*, window::WindowResolution};
-use bevy_av1::{VideoPlayer, VideoPlugin, VideoSink};
+use bevy_av1::{PlaybackMode, VideoPlayer, VideoPlugin, VideoSink};
 
 fn main() {
     let mut app = App::new();
@@ -22,6 +22,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn(VideoPlayer::new(
             asset_server.load("av1/cosmos-laundromat.ivf"),
+            PlaybackMode::Remove,
         ))
         .observe(
             |trigger: Trigger<OnAdd, VideoSink>,

@@ -1,5 +1,5 @@
 use bevy::{prelude::*, window::WindowResolution};
-use bevy_av1::{VideoPlayer, VideoPlugin, VideoSink};
+use bevy_av1::{PlaybackMode, VideoPlayer, VideoPlugin, VideoSink};
 
 fn main() {
     let mut app = App::new();
@@ -29,7 +29,10 @@ fn setup(
     commands.spawn((Camera3d::default(), Transform::from_xyz(0.0, 0.0, 2.0)));
     commands
         .spawn((
-            VideoPlayer::new(asset_server.load("av1/cosmos-laundromat.ivf")),
+            VideoPlayer::new(
+                asset_server.load("av1/cosmos-laundromat.ivf"),
+                PlaybackMode::Loop,
+            ),
             Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
             MeshMaterial3d(materials.add(StandardMaterial::default())),
         ))
@@ -42,15 +45,15 @@ fn setup(
             )>,
              mut materials: ResMut<Assets<StandardMaterial>>| {
                 let entity = trigger.target();
-                if let Ok((sink, mesh_material, mut transform)) = sinks.get_mut(entity) {
-                    if let Some(material) = materials.get_mut(&mesh_material.0) {
-                        material.base_color_texture = Some(sink.image().clone());
-                        let aspect = sink.width() as f32 / sink.height() as f32;
-                        if aspect > 1.0 {
-                            transform.scale = Vec3::new(aspect, 1.0, 1.0);
-                        } else {
-                            transform.scale = Vec3::new(1.0, aspect, 1.0);
-                        }
+                if let Ok((sink, mesh_material, mut transform)) = sinks.get_mut(entity)
+                    && let Some(material) = materials.get_mut(&mesh_material.0)
+                {
+                    material.base_color_texture = Some(sink.image().clone());
+                    let aspect = sink.width() as f32 / sink.height() as f32;
+                    if aspect > 1.0 {
+                        transform.scale = Vec3::new(aspect, 1.0, 1.0);
+                    } else {
+                        transform.scale = Vec3::new(1.0, aspect, 1.0);
                     }
                 }
             },
