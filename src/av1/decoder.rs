@@ -14,7 +14,7 @@ use bevy::{
 };
 use std::result::Result;
 
-use crate::{av1, video_source::VideoFrame};
+use crate::{av1, decodable::VideoFrame};
 
 // Based on https://github.com/rust-av/dav1d-rs/blob/master/tools/src/main.rs
 
@@ -184,7 +184,7 @@ impl<R: Read + Seek + Send> Decoder<R> {
     }
 }
 
-impl<R: Read + Seek + Send> crate::video_source::Decoder for Decoder<R> {
+impl<R: Read + Seek + Send> crate::decodable::Decoder for Decoder<R> {
     fn width(&self) -> u32 {
         self.demuxer.width() as u32
     }

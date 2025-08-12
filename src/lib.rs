@@ -1,19 +1,20 @@
 use bevy::prelude::*;
 
-use crate::{
-    systems::{play_videos, poll_video_sinks, render_video_sinks},
-    video_source::{AddVideoSource, VideoLoader},
-};
-
 mod av1;
+mod decodable;
 mod systems;
 mod video;
 mod video_sink;
 mod video_source;
 pub use crate::{
+    decodable::{Decodable, Decoder, VideoFrame},
     video::{PlaybackMode, VideoPlayer},
     video_sink::VideoSink,
-    video_source::{Decodable, Decoder, VideoFrame, VideoSource},
+    video_source::VideoSource,
+};
+use crate::{
+    systems::{play_videos, poll_video_sinks, render_video_sinks},
+    video_source::{AddVideoSource, VideoLoader},
 };
 #[doc(no_inline)]
 pub use async_channel::Sender;

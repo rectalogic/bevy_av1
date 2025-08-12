@@ -5,7 +5,7 @@ use bevy::{
     tasks::{Task, block_on, futures_lite::future},
 };
 
-use crate::video_source::VideoFrame;
+use crate::decodable::VideoFrame;
 
 #[derive(Component)]
 pub struct DrainVideoSink;

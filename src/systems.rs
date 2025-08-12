@@ -1,8 +1,8 @@
 use crate::{
     PlaybackMode,
+    decodable::{Decodable, Decoder},
     video::VideoPlayer,
     video_sink::{DrainVideoSink, VideoSink},
-    video_source::{Decodable, Decoder},
 };
 use bevy::{
     asset::RenderAssetUsages,

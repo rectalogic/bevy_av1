@@ -1,8 +1,6 @@
 use bevy::prelude::*;
 
-use crate::video_source::{Decodable, VideoSource};
-
-//XXX add PlaybackSettings to control mode, paused etc.?
+use crate::{decodable::Decodable, video_source::VideoSource};
 
 #[derive(Component, Clone)]
 pub struct VideoPlayer<Source = VideoSource>
