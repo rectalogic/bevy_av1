@@ -69,9 +69,9 @@ impl Decoder for CustomDecoder {
         let timebase = self.timebase();
         let frame_duration = timebase.0 as f32 / timebase.1 as f32;
 
-        const BLACK_PIXEL: [u8; 4] = [0, 0, 0, 255];
-        const WHITE_PIXEL: [u8; 4] = [255, 255, 255, 255];
-        const PIXEL_OPTIONS: [[u8; 4]; 2] = [BLACK_PIXEL, WHITE_PIXEL];
+        const NTSC_BLACK_PIXEL: [u8; 4] = [16, 16, 16, 255];
+        const NTSC_WHITE_PIXEL: [u8; 4] = [235, 235, 235, 255];
+        const PIXEL_OPTIONS: [[u8; 4]; 2] = [NTSC_BLACK_PIXEL, NTSC_WHITE_PIXEL];
         let mut rng = SmallRng::seed_from_u64(1);
 
         // We generate random "static".

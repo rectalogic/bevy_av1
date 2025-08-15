@@ -1,4 +1,38 @@
-//! Video support for the game engine Bevy
+/*!
+Video support for the game engine Bevy.
+Supports decoding [AV1](https://aomedia.org/av1-features/) video in an
+[IVF](https://wiki.multimedia.cx/index.php/Duck_IVF) container.
+
+Extensible to other formats by implementing [`Decodable`] + [`Asset`].
+
+# Usage
+
+Add [`VideoPlugin`] to your Bevy [`App`], then load a [`VideoSource`] asset and
+spawn a [`VideoPlayer`] component.
+
+```rust
+# use bevy::prelude::*;
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands
+        .spawn(VideoPlayer::new(
+            asset_server.load("av1/cosmos-laundromat.ivf"),
+            PlaybackMode::Remove,
+        ))
+        .observe(
+            |trigger: Trigger<OnAdd, VideoSink>,
+             sinks: Query<&VideoSink>,
+             mut commands: Commands| {
+                let entity = trigger.target();
+                if let Ok(sink) = sinks.get(entity) {
+                    commands
+                        .entity(entity)
+                        .insert(Sprite::from_image(sink.image().clone()));
+                }
+            },
+        );
+}
+```
+ */
 
 use bevy::prelude::*;
 

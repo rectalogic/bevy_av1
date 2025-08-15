@@ -1,0 +1,36 @@
+name: Publish crate
+
+on:
+  push:
+    tags:
+      - v**
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Build distribution package
+    environment: release
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rustup
+        run: rustup update stable
+      - name: Install dav1d
+        run: sudo apt-get update && sudo apt-get -y install libdav1d-dev
+      - name: Get version
+        id: version
+        run: |
+          echo crate=$(cargo metadata --format-version 1 --no-deps | jq --raw-output  '.packages | map(select(.name == "'bevy_av1'")) | .[0].version') >> "$GITHUB_OUTPUT"
+      # - uses: rust-lang/crates-io-auth-action@v1
+      #   id: auth
+      - name: Publish
+        if: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name == format('v{0}', steps.version.outputs.crate) }}
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          # CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
