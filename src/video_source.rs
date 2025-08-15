@@ -26,7 +26,7 @@ impl Decodable for VideoSource {
     }
 }
 
-/// Loads files as [`VideoSource`] [`Assets`](bevy_asset::Assets)
+/// Loads files as [`VideoSource`] [`Assets`]
 ///
 /// This asset loader supports the AV1 video codec in an IVF container.
 #[derive(Default)]
@@ -56,14 +56,14 @@ impl AssetLoader for VideoLoader {
 }
 
 /// A trait that allows adding a custom video source to the object.
-/// This is implemented for [`App`][bevy_app::App] to allow registering custom [`Decodable`] types.
+/// This is implemented for [`App`] to allow registering custom [`Decodable`] types.
 pub trait AddVideoSource {
     /// Registers a video source.
-    /// The type must implement [`Decodable`],
-    /// so that it can be converted to a [`Decoder`] type,
+    /// The type must implement [`super::Decodable`],
+    /// so that it can be converted to a [`super::Decoder`] type,
     /// and [`Asset`], so that it can be registered as an asset.
-    /// To use this method on [`App`][bevy_app::App],
-    /// the [video][super::VideoPlugin] and [asset][bevy_asset::AssetPlugin] plugins must be added first.
+    /// To use this method on [`App`],
+    /// the [video][super::VideoPlugin] and [asset][AssetPlugin] plugins must be added first.
     fn add_video_source<T>(&mut self) -> &mut Self
     where
         T: Decodable + Asset;
