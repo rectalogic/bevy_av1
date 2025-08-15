@@ -26,11 +26,10 @@ jobs:
         id: version
         run: |
           echo crate=$(cargo metadata --format-version 1 --no-deps | jq --raw-output  '.packages | map(select(.name == "'bevy_av1'")) | .[0].version') >> "$GITHUB_OUTPUT"
-      # - uses: rust-lang/crates-io-auth-action@v1
-      #   id: auth
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
       - name: Publish
         if: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name == format('v{0}', steps.version.outputs.crate) }}
         run: cargo publish
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          # CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
