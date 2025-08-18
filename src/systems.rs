@@ -2,7 +2,7 @@ use crate::{
     PlaybackMode,
     decodable::{Decodable, Decoder},
     video::VideoPlayer,
-    video_sink::{DrainVideoSink, VideoSink},
+    video_sink::{DrainVideoSink, VideoFrameUpdated, VideoSink},
 };
 use bevy::{
     asset::RenderAssetUsages,
@@ -67,6 +67,7 @@ pub fn render_video_sinks<Source: Asset + Decodable>(
     mut images: ResMut<Assets<Image>>,
     time: Res<Time>,
     mut commands: Commands,
+    mut video_frame_events: EventWriter<VideoFrameUpdated>,
 ) {
     for (entity, mut sink, player, drain) in &mut query_playing {
         match sink.next_frame(time.elapsed()) {
@@ -92,6 +93,7 @@ pub fn render_video_sinks<Source: Asset + Decodable>(
             Some(frame) => {
                 if let Some(image) = images.get_mut(sink.image()) {
                     *image = frame.image;
+                    video_frame_events.write(VideoFrameUpdated(sink.image().id()));
                 }
             }
         }

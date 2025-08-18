@@ -1,3 +1,6 @@
+//! Example implementing a custom video source [`Asset`].
+//! The [`Decoder`] just synthesizes NTSC TV static video frames.
+
 use bevy::{
     asset::RenderAssetUsages,
     prelude::*,
@@ -19,7 +22,7 @@ fn main() {
     app.run();
 }
 
-#[derive(Asset, Debug, Clone, TypePath)]
+#[derive(Asset, Debug, Clone, Reflect)]
 struct CustomVideoSource {
     width: u32,
     height: u32,

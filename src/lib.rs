@@ -45,11 +45,12 @@ mod video_source;
 pub use crate::{
     decodable::{Decodable, Decoder, VideoFrame},
     video::{PlaybackMode, VideoPlayer},
-    video_sink::VideoSink,
+    video_sink::{VideoSink, VideoTargetAssets},
     video_source::{AddVideoSource, VideoSource},
 };
 use crate::{
     systems::{play_videos, poll_video_sinks, render_video_sinks},
+    video_sink::VideoFrameUpdated,
     video_source::VideoLoader,
 };
 #[doc(no_inline)]
@@ -64,6 +65,7 @@ impl Plugin for VideoPlugin {
     fn build(&self, app: &mut App) {
         app.add_video_source::<VideoSource>()
             .init_asset_loader::<VideoLoader>()
+            .add_event::<VideoFrameUpdated>()
             .add_systems(Update, poll_video_sinks);
     }
 }
@@ -75,6 +77,28 @@ impl AddVideoSource for App {
     {
         self.init_asset::<T>()
             .add_systems(Update, (play_videos::<T>, render_video_sinks::<T>));
+        self
+    }
+}
+
+/// Adds video-related methods to [`App`].
+pub trait VideoTargetApp {
+    /// Registers a target [`Asset`] type.
+    /// This is an asset that uses the [`Image`] asset from [`VideoSink`].
+    /// This must be called before using [`VideoTargetAssets::add_target`]
+    fn init_video_target_asset<A: Asset>(&mut self) -> &mut Self;
+}
+
+impl VideoTargetApp for App {
+    fn init_video_target_asset<A: Asset>(&mut self) -> &mut Self {
+        self.init_resource::<VideoTargetAssets<A>>().add_systems(
+            PostUpdate,
+            (
+                VideoTargetAssets::<A>::update_target_assets,
+                VideoTargetAssets::<A>::remove_unused_image_target_assets,
+                VideoTargetAssets::<A>::remove_unused_target_assets,
+            ),
+        );
         self
     }
 }

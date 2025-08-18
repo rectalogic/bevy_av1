@@ -7,7 +7,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 /// A source of video data.
-#[derive(Asset, Debug, Clone, TypePath)]
+#[derive(Asset, Debug, Clone, Reflect)]
 pub struct VideoSource {
     pub bytes: Arc<[u8]>,
 }

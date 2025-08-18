@@ -1,3 +1,5 @@
+//! Example showing rendering video in a 2D [`Sprite`] component.
+
 use bevy::{prelude::*, window::WindowResolution};
 use bevy_av1::{PlaybackMode, VideoPlayer, VideoPlugin, VideoSink};
 

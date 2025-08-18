@@ -104,3 +104,77 @@ impl VideoSink {
         &self.image
     }
 }
+
+#[derive(Event, Debug)]
+pub struct VideoFrameUpdated(pub AssetId<Image>);
+
+/// Stores target [`AssetId`]s of assets that have a dependency on the video [`Image`] asset.
+///
+/// e.g. if you store the [`VideoSink::image`] in `StandardMaterial::base_color_texture`
+/// you can [`VideoTargetAssets::add_target`] to ensure the material is updated when the image updates.
+#[derive(Resource)]
+pub struct VideoTargetAssets<A: Asset>(Vec<TargetAsset<A>>);
+
+impl<A: Asset> Default for VideoTargetAssets<A> {
+    fn default() -> Self {
+        Self(Vec::default())
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct TargetAsset<A: Asset> {
+    pub image_id: AssetId<Image>,
+    pub target_asset_id: AssetId<A>,
+}
+
+impl<A: Asset> VideoTargetAssets<A> {
+    /// Add a target asset that has a dependency on the video image.
+    /// This ensures the asset is updated whenever the video image changes.
+    pub fn add_target<TAI: Into<AssetId<A>>>(&mut self, sink: &VideoSink, target_asset_id: TAI) {
+        self.0.push(TargetAsset {
+            image_id: sink.image().id(),
+            target_asset_id: target_asset_id.into(),
+        })
+    }
+
+    pub(crate) fn update_target_assets(
+        video_target_assets: Res<Self>,
+        mut target_assets: ResMut<Assets<A>>,
+        mut video_frame_events: EventReader<VideoFrameUpdated>,
+    ) {
+        if video_target_assets.0.is_empty() {
+            return;
+        }
+        for event in video_frame_events.read() {
+            video_target_assets.0.iter().for_each(|a| {
+                if a.image_id == event.0 {
+                    target_assets.get_mut(a.target_asset_id);
+                }
+            });
+        }
+    }
+
+    pub(crate) fn remove_unused_image_target_assets(
+        mut video_target_assets: ResMut<Self>,
+        mut image_events: EventReader<AssetEvent<Image>>,
+    ) {
+        for event in image_events.read() {
+            if let AssetEvent::Unused { id: image_id } = event {
+                video_target_assets.0.retain(|e| &e.image_id != image_id);
+            }
+        }
+    }
+
+    pub(crate) fn remove_unused_target_assets(
+        mut video_target_assets: ResMut<Self>,
+        mut target_asset_events: EventReader<AssetEvent<A>>,
+    ) {
+        for event in target_asset_events.read() {
+            if let AssetEvent::Unused { id: asset_id } = event {
+                video_target_assets
+                    .0
+                    .retain(|e| &e.target_asset_id != asset_id);
+            }
+        }
+    }
+}

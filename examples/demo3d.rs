@@ -1,5 +1,9 @@
+//! Example showing using video as a texture on a [`StandardMaterial`] applied to a 3D mesh.
+
 use bevy::{prelude::*, window::WindowResolution};
-use bevy_av1::{PlaybackMode, VideoPlayer, VideoPlugin, VideoSink};
+use bevy_av1::{
+    PlaybackMode, VideoPlayer, VideoPlugin, VideoSink, VideoTargetApp, VideoTargetAssets,
+};
 
 fn main() {
     let mut app = App::new();
@@ -13,6 +17,7 @@ fn main() {
         }),
         VideoPlugin,
     ))
+    .init_video_target_asset::<StandardMaterial>()
     .add_systems(Startup, setup)
     .add_systems(Update, update);
 
@@ -43,11 +48,13 @@ fn setup(
                 &MeshMaterial3d<StandardMaterial>,
                 &mut Transform,
             )>,
-             mut materials: ResMut<Assets<StandardMaterial>>| {
+             mut materials: ResMut<Assets<StandardMaterial>>,
+             mut video_targets: ResMut<VideoTargetAssets<StandardMaterial>>| {
                 let entity = trigger.target();
                 if let Ok((sink, mesh_material, mut transform)) = sinks.get_mut(entity)
                     && let Some(material) = materials.get_mut(&mesh_material.0)
                 {
+                    video_targets.add_target(sink, &mesh_material.0);
                     material.base_color_texture = Some(sink.image().clone());
                     let aspect = sink.width() as f32 / sink.height() as f32;
                     if aspect > 1.0 {
@@ -60,14 +67,8 @@ fn setup(
         );
 }
 
-fn update(
-    mut videos: Query<(&mut Transform, &MeshMaterial3d<StandardMaterial>), With<VideoPlayer>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    time: Res<Time>,
-) {
-    for (mut transform, mesh_material) in videos.iter_mut() {
+fn update(mut videos: Query<&mut Transform, With<VideoPlayer>>, time: Res<Time>) {
+    for mut transform in videos.iter_mut() {
         transform.rotate_x(time.delta_secs() * 0.8);
-        // Workaround https://github.com/bevyengine/bevy/issues/20269
-        materials.get_mut(&mesh_material.0);
     }
 }

@@ -21,3 +21,11 @@ yuv = "0.8.6"
 [dev-dependencies]
 bevy = "0.16.1"
 rand = "0.9.2"
+
+[[example]]
+name = "demo3d"
+path = "examples/demo3d.rs"
+doc-scrape-examples = true
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
