@@ -130,7 +130,7 @@ pub struct TargetAsset<A: Asset> {
 impl<A: Asset> VideoTargetAssets<A> {
     /// Add a target asset that has a dependency on the video image.
     /// This ensures the asset is updated whenever the video image changes.
-    pub fn add_target<TAI: Into<AssetId<A>>>(&mut self, sink: &VideoSink, target_asset_id: TAI) {
+    pub fn add_target(&mut self, sink: &VideoSink, target_asset_id: impl Into<AssetId<A>>) {
         self.0.push(TargetAsset {
             image_id: sink.image().id(),
             target_asset_id: target_asset_id.into(),

@@ -1,3 +1,6 @@
+[workspace]
+members = ["xtask"]
+
 [package]
 name = "bevy_av1"
 description = "AV1 video decoder for Bevy"
