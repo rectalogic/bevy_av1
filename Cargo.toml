@@ -4,7 +4,7 @@ members = ["xtask"]
 [package]
 name = "bevy_av1"
 description = "AV1 video decoder for Bevy"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 keywords = ["bevy", "video", "av1"]
 license = "MIT OR Apache-2.0"
