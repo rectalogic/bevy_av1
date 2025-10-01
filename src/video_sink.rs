@@ -105,7 +105,7 @@ impl VideoSink {
     }
 }
 
-#[derive(Event, Debug)]
+#[derive(Message, Debug)]
 pub struct VideoFrameUpdated(pub AssetId<Image>);
 
 /// Stores target [`AssetId`]s of assets that have a dependency on the video [`Image`] asset.
@@ -140,7 +140,7 @@ impl<A: Asset> VideoTargetAssets<A> {
     pub(crate) fn update_target_assets(
         video_target_assets: Res<Self>,
         mut target_assets: ResMut<Assets<A>>,
-        mut video_frame_events: EventReader<VideoFrameUpdated>,
+        mut video_frame_events: MessageReader<VideoFrameUpdated>,
     ) {
         if video_target_assets.0.is_empty() {
             return;
@@ -156,7 +156,7 @@ impl<A: Asset> VideoTargetAssets<A> {
 
     pub(crate) fn remove_unused_image_target_assets(
         mut video_target_assets: ResMut<Self>,
-        mut image_events: EventReader<AssetEvent<Image>>,
+        mut image_events: MessageReader<AssetEvent<Image>>,
     ) {
         for event in image_events.read() {
             if let AssetEvent::Unused { id: image_id } = event {
@@ -167,7 +167,7 @@ impl<A: Asset> VideoTargetAssets<A> {
 
     pub(crate) fn remove_unused_target_assets(
         mut video_target_assets: ResMut<Self>,
-        mut target_asset_events: EventReader<AssetEvent<A>>,
+        mut target_asset_events: MessageReader<AssetEvent<A>>,
     ) {
         for event in target_asset_events.read() {
             if let AssetEvent::Unused { id: asset_id } = event {

@@ -42,7 +42,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             PlaybackMode::Loop,
         ))
         .observe(
-            |trigger: Trigger<OnAdd, VideoSink>,
+            |add: On<Add, VideoSink>,
              commands: Commands,
              mut sinks: Query<&VideoSink>,
              meshes: ResMut<Assets<Mesh>>,
@@ -50,7 +50,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
              color_materials: ResMut<Assets<ColorMaterial>>,
              standard_material_video_targets: ResMut<VideoTargetAssets<StandardMaterial>>,
              color_material_video_targets: ResMut<VideoTargetAssets<ColorMaterial>>| {
-                let entity = trigger.target();
+                let entity = add.entity;
                 if let Ok(sink) = sinks.get_mut(entity) {
                     spawn_video_targets(
                         sink,
@@ -73,7 +73,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             PlaybackMode::Remove,
         ))
         .observe(
-            |trigger: Trigger<OnAdd, VideoSink>,
+            |add: On<Add, VideoSink>,
              commands: Commands,
              mut sinks: Query<&VideoSink>,
              meshes: ResMut<Assets<Mesh>>,
@@ -81,7 +81,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
              color_materials: ResMut<Assets<ColorMaterial>>,
              standard_material_video_targets: ResMut<VideoTargetAssets<StandardMaterial>>,
              color_material_video_targets: ResMut<VideoTargetAssets<ColorMaterial>>| {
-                let entity = trigger.target();
+                let entity = add.entity;
                 if let Ok(sink) = sinks.get_mut(entity) {
                     spawn_video_targets(
                         sink,

@@ -123,10 +123,8 @@ fn setup(mut commands: Commands, mut custom_sources: ResMut<Assets<CustomVideoSo
             mode: PlaybackMode::Loop,
         })
         .observe(
-            |trigger: Trigger<OnAdd, VideoSink>,
-             sinks: Query<&VideoSink>,
-             mut commands: Commands| {
-                let entity = trigger.target();
+            |add: On<Add, VideoSink>, sinks: Query<&VideoSink>, mut commands: Commands| {
+                let entity = add.entity;
                 if let Ok(sink) = sinks.get(entity) {
                     commands
                         .entity(entity)

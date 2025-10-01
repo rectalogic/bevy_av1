@@ -12,6 +12,7 @@ spawn a [`VideoPlayer`] component.
 
 ```rust
 # use bevy::prelude::*;
+# use bevy_av1::{PlaybackMode, VideoPlayer, VideoSink};
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn(VideoPlayer::new(
@@ -19,10 +20,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             PlaybackMode::Remove,
         ))
         .observe(
-            |trigger: Trigger<OnAdd, VideoSink>,
+            |add: On<Add, VideoSink>,
              sinks: Query<&VideoSink>,
              mut commands: Commands| {
-                let entity = trigger.target();
+                let entity = add.entity;
                 if let Ok(sink) = sinks.get(entity) {
                     commands
                         .entity(entity)
@@ -65,7 +66,7 @@ impl Plugin for VideoPlugin {
     fn build(&self, app: &mut App) {
         app.add_video_source::<VideoSource>()
             .init_asset_loader::<VideoLoader>()
-            .add_event::<VideoFrameUpdated>()
+            .add_message::<VideoFrameUpdated>()
             .add_systems(Update, poll_video_sinks);
     }
 }

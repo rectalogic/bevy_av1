@@ -10,7 +10,7 @@ fn main() {
     app.add_plugins((
         DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: WindowResolution::new(1718.0, 720.0),
+                resolution: WindowResolution::new(1718, 720),
                 ..default()
             }),
             ..default()
@@ -42,7 +42,7 @@ fn setup(
             MeshMaterial3d(materials.add(StandardMaterial::default())),
         ))
         .observe(
-            |trigger: Trigger<OnAdd, VideoSink>,
+            |add: On<Add, VideoSink>,
              mut sinks: Query<(
                 &VideoSink,
                 &MeshMaterial3d<StandardMaterial>,
@@ -50,7 +50,7 @@ fn setup(
             )>,
              mut materials: ResMut<Assets<StandardMaterial>>,
              mut video_targets: ResMut<VideoTargetAssets<StandardMaterial>>| {
-                let entity = trigger.target();
+                let entity = add.entity;
                 if let Ok((sink, mesh_material, mut transform)) = sinks.get_mut(entity)
                     && let Some(material) = materials.get_mut(&mesh_material.0)
                 {

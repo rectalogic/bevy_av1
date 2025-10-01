@@ -8,7 +8,7 @@ fn main() {
     app.add_plugins((
         DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: WindowResolution::new(1718.0, 720.0),
+                resolution: WindowResolution::new(1718, 720),
                 ..default()
             }),
             ..default()
@@ -27,10 +27,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             PlaybackMode::Remove,
         ))
         .observe(
-            |trigger: Trigger<OnAdd, VideoSink>,
-             sinks: Query<&VideoSink>,
-             mut commands: Commands| {
-                let entity = trigger.target();
+            |add: On<Add, VideoSink>, sinks: Query<&VideoSink>, mut commands: Commands| {
+                let entity = add.entity;
                 if let Ok(sink) = sinks.get(entity) {
                     commands
                         .entity(entity)

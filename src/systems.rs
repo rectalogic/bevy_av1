@@ -67,7 +67,7 @@ pub fn render_video_sinks<Source: Asset + Decodable>(
     mut images: ResMut<Assets<Image>>,
     time: Res<Time>,
     mut commands: Commands,
-    mut video_frame_events: EventWriter<VideoFrameUpdated>,
+    mut video_frame_events: MessageWriter<VideoFrameUpdated>,
 ) {
     for (entity, mut sink, player, drain) in &mut query_playing {
         match sink.next_frame(time.elapsed()) {
