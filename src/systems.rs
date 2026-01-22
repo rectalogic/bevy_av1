@@ -70,6 +70,11 @@ pub fn render_video_sinks<Source: Asset + Decodable>(
     mut video_frame_events: MessageWriter<VideoFrameUpdated>,
 ) {
     for (entity, mut sink, player, drain) in &mut query_playing {
+        if player.paused {
+            sink.halt_frame(time.elapsed());
+            continue;
+        }
+
         match sink.next_frame(time.elapsed()) {
             None => {
                 // If draining and no more frames, tear down

@@ -21,6 +21,8 @@ where
     pub source: Handle<Source>,
     /// The video playback mode.
     pub mode: PlaybackMode,
+    /// Whether the video is currently playing.
+    pub paused: bool,
 }
 
 impl VideoPlayer<VideoSource> {
@@ -30,7 +32,7 @@ impl VideoPlayer<VideoSource> {
     /// initialize an [`VideoPlayer`] with a different type, just initialize it directly using normal
     /// struct syntax.
     pub fn new(source: Handle<VideoSource>, mode: PlaybackMode) -> Self {
-        Self { source, mode }
+        Self { source, mode, paused: false }
     }
 }
 
