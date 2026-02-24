@@ -29,7 +29,7 @@ impl Decodable for VideoSource {
 /// Loads files as [`VideoSource`] [`Assets`]
 ///
 /// This asset loader supports the AV1 video codec in an IVF container.
-#[derive(Default)]
+#[derive(Default, TypePath)]
 pub struct VideoLoader;
 
 impl AssetLoader for VideoLoader {

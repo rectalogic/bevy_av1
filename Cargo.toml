@@ -12,17 +12,17 @@ repository = "https://github.com/rectalogic/bevy_av1"
 
 [dependencies]
 async-channel = "2.5.0"
-bevy = { version = "0.17", default-features = false, features = [
+bevy = { version = "0.18", default-features = false, features = [
     "bevy_asset",
     "bevy_core_pipeline",
     "bevy_log",
 ] }
-bitstream-io = "4.5.0"
+bitstream-io = "4.9.0"
 dav1d = "0.11.0"
-yuv = "0.8.6"
+yuv = "0.8.11"
 
 [dev-dependencies]
-bevy = "0.17"
+bevy = "0.18"
 rand = "0.9.2"
 
 [[example]]
