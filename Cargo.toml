@@ -22,7 +22,7 @@ dav1d = "0.11.0"
 yuv = "0.8.11"
 
 [dev-dependencies]
-bevy = "0.18"
+bevy = { version = "0.18", features = ["https"] }
 rand = "0.9.2"
 
 [[example]]
