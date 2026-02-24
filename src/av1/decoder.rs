@@ -7,6 +7,7 @@ use yuv::{
     yuv422_to_bgra, yuv444_to_bgra,
 };
 
+use super::{Demuxer, Demuxers};
 use bevy::{
     asset::RenderAssetUsages,
     prelude::*,
@@ -18,18 +19,18 @@ use crate::{av1, decodable::VideoFrame};
 
 // Based on https://github.com/rust-av/dav1d-rs/blob/master/tools/src/main.rs
 
-pub struct Decoder<R: Read + Seek + Send> {
+pub struct Decoder<R: Read + Send> {
     decoder: dav1d::Decoder,
-    demuxer: av1::ivf::Demuxer<R>,
+    demuxer: Demuxers<R>,
 }
 
 impl<R: Read + Seek + Send> Decoder<R> {
-    pub fn new(reader: R) -> Result<Self, av1::Error> {
+    pub fn new(demuxer: Demuxers<R>) -> Result<Self, av1::Error> {
         let mut settings = dav1d::Settings::new();
         settings.set_n_threads(1);
         Ok(Self {
             decoder: dav1d::Decoder::with_settings(&settings).map_err(av1::Error::Decoder)?,
-            demuxer: av1::ivf::Demuxer::new(reader).map_err(av1::Error::Demuxer)?,
+            demuxer,
         })
     }
 
@@ -71,7 +72,7 @@ impl<R: Read + Seek + Send> Decoder<R> {
             self.handle_pending_pictures(&tx, true).await?;
 
             if loop_ {
-                self.demuxer.reset().map_err(av1::Error::Demuxer)?;
+                self.demuxer.reset()?;
             } else {
                 break;
             }

@@ -6,10 +6,17 @@ use bevy::{
 use std::io::Cursor;
 use std::sync::Arc;
 
-/// A source of video data.
+#[derive(Debug, Clone, Reflect)]
+enum Format {
+    Ivf,
+    Mp4,
+}
+
+/// A source of AV1 video data in an IVF or MP4 container.
 #[derive(Asset, Debug, Clone, Reflect)]
 pub struct VideoSource {
     pub bytes: Arc<[u8]>,
+    format: Format,
 }
 
 impl AsRef<[u8]> for VideoSource {
@@ -21,14 +28,22 @@ impl AsRef<[u8]> for VideoSource {
 impl Decodable for VideoSource {
     type Decoder = av1::Decoder<Cursor<VideoSource>>;
 
-    fn decoder(&self) -> Self::Decoder {
-        av1::Decoder::new(Cursor::new(self.clone())).unwrap()
+    fn decoder(&self) -> Result<Self::Decoder, BevyError> {
+        let demuxer = match self.format {
+            Format::Ivf => {
+                av1::Demuxers::Ivf(av1::ivf::IvfDemuxer::new(Cursor::new(self.clone()))?)
+            }
+            Format::Mp4 => {
+                av1::Demuxers::Mp4(av1::mp4::Mp4Demuxer::new(Cursor::new(self.clone()))?)
+            }
+        };
+        Ok(Self::Decoder::new(demuxer)?)
     }
 }
 
-/// Loads files as [`VideoSource`] [`Assets`]
+/// Loads IVF/MP4 files as [`VideoSource`] [`Assets`]
 ///
-/// This asset loader supports the AV1 video codec in an IVF container.
+/// This asset loader supports the AV1 video codec in an IVF or MP4 container.
 #[derive(Default, TypePath)]
 pub struct VideoLoader;
 
@@ -41,17 +56,22 @@ impl AssetLoader for VideoLoader {
         &self,
         reader: &mut dyn Reader,
         _settings: &Self::Settings,
-        _load_context: &mut LoadContext<'_>,
-    ) -> Result<VideoSource, Self::Error> {
+        load_context: &mut LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
-        Ok(VideoSource {
+        Ok(Self::Asset {
             bytes: bytes.into(),
+            format: if load_context.path().get_full_extension().as_deref() == Some("mp4") {
+                Format::Mp4
+            } else {
+                Format::Ivf
+            },
         })
     }
 
     fn extensions(&self) -> &[&str] {
-        &["ivf"]
+        &["ivf", "mp4"]
     }
 }
 

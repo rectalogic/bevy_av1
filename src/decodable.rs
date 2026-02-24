@@ -41,5 +41,5 @@ pub trait Decodable: Send + Sync + 'static {
     type Decoder: Decoder + Send;
 
     /// Build and return a [`Self::Decoder`] of the implementing type
-    fn decoder(&self) -> Self::Decoder;
+    fn decoder(&self) -> Result<Self::Decoder, BevyError>;
 }

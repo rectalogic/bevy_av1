@@ -1,9 +1,10 @@
+use super::{Demuxer, Error, Packet};
 use bitstream_io::{ByteRead, ByteReader, LittleEndian};
 use std::io::{self, Read, Seek, SeekFrom};
 
 pub const HEADER_SIZE: u64 = 32;
 
-pub struct Demuxer<R: Read + Send> {
+pub struct IvfDemuxer<R: Read + Send> {
     reader: ByteReader<R, LittleEndian>,
     header: Header,
 }
@@ -17,28 +18,11 @@ struct Header {
     pub timebase_den: u32,
 }
 
-pub struct Packet {
-    pub data: Vec<u8>,
-    pub pts: u64,
-}
-
-impl<R: Read + Seek + Send> Demuxer<R> {
+impl<R: Read + Seek + Send> IvfDemuxer<R> {
     pub fn new(reader: R) -> io::Result<Self> {
         let mut reader = ByteReader::endian(reader, LittleEndian);
         let header = Self::read_header(&mut reader)?;
         Ok(Self { reader, header })
-    }
-
-    pub fn width(&self) -> u16 {
-        self.header.w
-    }
-
-    pub fn height(&self) -> u16 {
-        self.header.h
-    }
-
-    pub fn timebase(&self) -> (u32, u32) {
-        (self.header.timebase_num, self.header.timebase_den)
     }
 
     fn read_header(br: &mut ByteReader<R, LittleEndian>) -> io::Result<Header> {
@@ -78,18 +62,35 @@ impl<R: Read + Seek + Send> Demuxer<R> {
             timebase_den,
         })
     }
+}
 
-    pub fn read_packet(&mut self) -> io::Result<Packet> {
-        let len = self.reader.read::<u32>()?;
-        let pts = self.reader.read::<u64>()?;
+impl<R: Read + Seek + Send> Demuxer for IvfDemuxer<R> {
+    fn width(&self) -> u16 {
+        self.header.w
+    }
+
+    fn height(&self) -> u16 {
+        self.header.h
+    }
+
+    fn timebase(&self) -> (u32, u32) {
+        (self.header.timebase_num, self.header.timebase_den)
+    }
+
+    fn read_packet(&mut self) -> Result<Packet, Error> {
+        let len = self.reader.read::<u32>().map_err(Error::Demuxer)?;
+        let pts = self.reader.read::<u64>().map_err(Error::Demuxer)?;
         let mut buf = vec![0u8; len as usize];
-        self.reader.read_bytes(&mut buf)?;
+        self.reader.read_bytes(&mut buf).map_err(Error::Demuxer)?;
 
         Ok(Packet { data: buf, pts })
     }
 
-    pub fn reset(&mut self) -> io::Result<()> {
-        self.reader.reader().seek(SeekFrom::Start(HEADER_SIZE))?;
+    fn reset(&mut self) -> Result<(), Error> {
+        self.reader
+            .reader()
+            .seek(SeekFrom::Start(HEADER_SIZE))
+            .map_err(Error::Demuxer)?;
         Ok(())
     }
 }

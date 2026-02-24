@@ -37,11 +37,11 @@ impl CustomVideoSource {
 impl Decodable for CustomVideoSource {
     type Decoder = CustomDecoder;
 
-    fn decoder(&self) -> Self::Decoder {
-        CustomDecoder {
+    fn decoder(&self) -> Result<Self::Decoder, BevyError> {
+        Ok(CustomDecoder {
             width: self.width,
             height: self.height,
-        }
+        })
     }
 }
 

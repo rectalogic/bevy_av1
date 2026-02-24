@@ -16,12 +16,12 @@ pub fn play_videos<Source: Asset + Decodable>(
     video_sources: Res<Assets<Source>>,
     mut images: ResMut<Assets<Image>>,
     mut commands: Commands,
-) {
+) -> Result<(), BevyError> {
     for (entity, player) in &query_nonplaying {
         let Some(video_source) = video_sources.get(&player.source) else {
             continue;
         };
-        let mut decoder = video_source.decoder();
+        let mut decoder = video_source.decoder()?;
         let timebase = decoder.timebase();
         let width = decoder.width();
         let height = decoder.height();
@@ -41,6 +41,7 @@ pub fn play_videos<Source: Asset + Decodable>(
         let sink = VideoSink::new(images.add(image), timebase, width, height, rx, task);
         commands.entity(entity).insert(sink);
     }
+    Ok(())
 }
 
 pub fn poll_video_sinks(
