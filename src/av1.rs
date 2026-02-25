@@ -6,6 +6,7 @@ use std::{
     io::{Read, Seek},
 };
 
+use bevy::ecs::error::BevyError;
 pub use decoder::Decoder;
 
 struct Packet {
@@ -21,7 +22,7 @@ trait Demuxer {
     fn reset(&mut self) -> Result<(), Error>;
 }
 
-pub enum Demuxers<R: Read + Send> {
+pub enum Demuxers<R: Read + Seek + Send> {
     Ivf(ivf::IvfDemuxer<R>),
     Mp4(mp4::Mp4Demuxer<R>),
 }
@@ -61,7 +62,8 @@ impl<R: Read + Seek + Send> Demuxer for Demuxers<R> {
 
 #[derive(Debug)]
 pub enum Error {
-    Demuxer(std::io::Error),
+    DemuxerIO(std::io::Error),
+    Demuxer(BevyError),
     ChannelClosed,
     Decoder(dav1d::Error),
     Conversion(yuv::YuvError),

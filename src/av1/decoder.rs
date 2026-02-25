@@ -19,7 +19,7 @@ use crate::{av1, decodable::VideoFrame};
 
 // Based on https://github.com/rust-av/dav1d-rs/blob/master/tools/src/main.rs
 
-pub struct Decoder<R: Read + Send> {
+pub struct Decoder<R: Read + Seek + Send> {
     decoder: dav1d::Decoder,
     demuxer: Demuxers<R>,
 }

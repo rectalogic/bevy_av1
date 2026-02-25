@@ -19,6 +19,7 @@ bevy = { version = "0.18", default-features = false, features = [
 ] }
 bitstream-io = "4.9.0"
 dav1d = "0.11.0"
+mp4 = "0.14.0"
 yuv = "0.8.11"
 
 [dev-dependencies]

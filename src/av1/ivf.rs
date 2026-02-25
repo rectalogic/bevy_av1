@@ -78,10 +78,10 @@ impl<R: Read + Seek + Send> Demuxer for IvfDemuxer<R> {
     }
 
     fn read_packet(&mut self) -> Result<Packet, Error> {
-        let len = self.reader.read::<u32>().map_err(Error::Demuxer)?;
-        let pts = self.reader.read::<u64>().map_err(Error::Demuxer)?;
+        let len = self.reader.read::<u32>().map_err(Error::DemuxerIO)?;
+        let pts = self.reader.read::<u64>().map_err(Error::DemuxerIO)?;
         let mut buf = vec![0u8; len as usize];
-        self.reader.read_bytes(&mut buf).map_err(Error::Demuxer)?;
+        self.reader.read_bytes(&mut buf).map_err(Error::DemuxerIO)?;
 
         Ok(Packet { data: buf, pts })
     }
@@ -90,7 +90,7 @@ impl<R: Read + Seek + Send> Demuxer for IvfDemuxer<R> {
         self.reader
             .reader()
             .seek(SeekFrom::Start(HEADER_SIZE))
-            .map_err(Error::Demuxer)?;
+            .map_err(Error::DemuxerIO)?;
         Ok(())
     }
 }
