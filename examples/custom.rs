@@ -13,6 +13,9 @@ use bevy_av1::{
 use rand::{SeedableRng, rngs::SmallRng, seq::IndexedRandom};
 use std::time::Duration;
 
+// 23.976 NTSC framerate
+const NTSC_TIMEBASE: (u32, u32) = (125, 2997);
+
 fn main() {
     let mut app = App::new();
     app.add_plugins((DefaultPlugins, VideoPlugin))
@@ -59,9 +62,8 @@ impl Decoder for CustomDecoder {
         self.height
     }
 
-    fn timebase(&self) -> (u32, u32) {
-        // 23.976 NTSC framerate
-        (125, 2997)
+    fn timescale(&self) -> u32 {
+        NTSC_TIMEBASE.1
     }
 
     async fn decode(
@@ -69,8 +71,7 @@ impl Decoder for CustomDecoder {
         tx: bevy_av1::Sender<bevy_av1::VideoFrame>,
         loop_: bool,
     ) -> Result<()> {
-        let timebase = self.timebase();
-        let frame_duration = timebase.0 as f32 / timebase.1 as f32;
+        let timescale = self.timescale() as f32;
 
         const NTSC_BLACK_PIXEL: [u8; 4] = [16, 16, 16, 255];
         const NTSC_WHITE_PIXEL: [u8; 4] = [235, 235, 235, 255];
@@ -99,7 +100,8 @@ impl Decoder for CustomDecoder {
 
             let frame = VideoFrame {
                 image,
-                timestamp: Duration::from_secs_f32((count as f32) * frame_duration),
+                timestamp: Duration::from_secs_f32((count * NTSC_TIMEBASE.0) as f32 / timescale),
+                duration: Duration::from_secs_f32(NTSC_TIMEBASE.0 as f32 / timescale),
             };
             tx.send(frame).await?;
 

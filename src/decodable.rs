@@ -9,6 +9,8 @@ pub struct VideoFrame {
     pub image: Image,
     /// The presentation timestamp of this frame.
     pub timestamp: Duration,
+    /// The duration of this frame.
+    pub duration: Duration,
 }
 
 /// A type implementing this trait can decode frames of video.
@@ -18,10 +20,8 @@ pub trait Decoder: Send {
     fn width(&self) -> u32;
     /// The height of a video frame.
     fn height(&self) -> u32;
-    /// The timebase of the decoded video `(numerator, denominator)`.
-    /// For example, 30fps video could be `(1, 30)`.
-    /// 23.976fps NTSC could be `(125, 2997)`.
-    fn timebase(&self) -> (u32, u32);
+    /// The timescale of the decoded video - time in 1 second.
+    fn timescale(&self) -> u32;
     /// Asynchronously decode frames of video and send them through channel `tx`.
     /// If `loop_` is `true`, this function does not return unless there is an error.
     fn decode(

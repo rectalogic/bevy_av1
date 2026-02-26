@@ -12,16 +12,18 @@ pub use decoder::Decoder;
 struct Packet {
     pub data: Vec<u8>,
     pub pts: u64,
+    pub duration: u32,
 }
 
 trait Demuxer {
     fn width(&self) -> u16;
     fn height(&self) -> u16;
-    fn timebase(&self) -> (u32, u32);
+    fn timescale(&self) -> u32;
     fn read_packet(&mut self) -> Result<Packet, Error>;
     fn reset(&mut self) -> Result<(), Error>;
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum Demuxers<R: Read + Seek + Send> {
     Ivf(ivf::IvfDemuxer<R>),
     Mp4(mp4::Mp4Demuxer<R>),
@@ -40,10 +42,10 @@ impl<R: Read + Seek + Send> Demuxer for Demuxers<R> {
             Demuxers::Mp4(mp4_demuxer) => mp4_demuxer.height(),
         }
     }
-    fn timebase(&self) -> (u32, u32) {
+    fn timescale(&self) -> u32 {
         match self {
-            Demuxers::Ivf(ivf_demuxer) => ivf_demuxer.timebase(),
-            Demuxers::Mp4(mp4_demuxer) => mp4_demuxer.timebase(),
+            Demuxers::Ivf(ivf_demuxer) => ivf_demuxer.timescale(),
+            Demuxers::Mp4(mp4_demuxer) => mp4_demuxer.timescale(),
         }
     }
     fn read_packet(&mut self) -> Result<Packet, Error> {

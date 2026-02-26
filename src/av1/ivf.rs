@@ -14,8 +14,7 @@ struct Header {
     pub w: u16,
     pub h: u16,
     pub frame_count: u32,
-    pub timebase_num: u32,
-    pub timebase_den: u32,
+    pub timebase: (u32, u32),
 }
 
 impl<R: Read + Seek + Send> IvfDemuxer<R> {
@@ -49,8 +48,10 @@ impl<R: Read + Seek + Send> IvfDemuxer<R> {
         let w = br.read::<u16>()?;
         let h = br.read::<u16>()?;
 
-        let timebase_den = br.read::<u32>()?;
-        let timebase_num = br.read::<u32>()?;
+        // This is framerate*timescale
+        let framerate = br.read::<u32>()?;
+        let timescale = br.read::<u32>()?;
+        let timebase = (timescale, framerate);
         let frames = br.read::<u32>()?;
         br.skip(4)?;
 
@@ -58,8 +59,7 @@ impl<R: Read + Seek + Send> IvfDemuxer<R> {
             w,
             h,
             frame_count: frames,
-            timebase_num,
-            timebase_den,
+            timebase,
         })
     }
 }
@@ -73,8 +73,8 @@ impl<R: Read + Seek + Send> Demuxer for IvfDemuxer<R> {
         self.header.h
     }
 
-    fn timebase(&self) -> (u32, u32) {
-        (self.header.timebase_num, self.header.timebase_den)
+    fn timescale(&self) -> u32 {
+        self.header.timebase.1
     }
 
     fn read_packet(&mut self) -> Result<Packet, Error> {
@@ -83,7 +83,11 @@ impl<R: Read + Seek + Send> Demuxer for IvfDemuxer<R> {
         let mut buf = vec![0u8; len as usize];
         self.reader.read_bytes(&mut buf).map_err(Error::DemuxerIO)?;
 
-        Ok(Packet { data: buf, pts })
+        Ok(Packet {
+            data: buf,
+            pts,
+            duration: self.header.timebase.0,
+        })
     }
 
     fn reset(&mut self) -> Result<(), Error> {

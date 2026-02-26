@@ -9,11 +9,9 @@ pub struct Mp4Demuxer<R: Read + Seek + Send> {
     width: u16,
     height: u16,
     current_sample: u32,
-    timebase: (u32, u32),
+    timescale: u32,
 }
 
-//XXX mp4 parser doesn't support AV1, try matroska which supports webm https://docs.rs/matroska-demuxer/0.7.0/matroska_demuxer/index.html
-// ugh, does youtube do av1 in webm?
 impl<R: Read + Seek + Send> Mp4Demuxer<R> {
     pub fn new(mut reader: R) -> Result<Self, BevyError> {
         let old_pos = reader.stream_position()?;
@@ -29,7 +27,7 @@ impl<R: Read + Seek + Send> Mp4Demuxer<R> {
             Ok(Self {
                 width: track.width(),
                 height: track.height(),
-                timebase: (1, track.timescale()),
+                timescale: track.timescale(),
                 reader: mp4,
                 current_sample: 1,
                 track_id,
@@ -49,9 +47,8 @@ impl<R: Read + Seek + Send> Demuxer for Mp4Demuxer<R> {
         self.height
     }
 
-    fn timebase(&self) -> (u32, u32) {
-        //XXX not sure this is correct, IVF is fixed fps but mp4 is not
-        self.timebase
+    fn timescale(&self) -> u32 {
+        self.timescale
     }
 
     //XXX change to distinguish error from EOF/loop
@@ -65,6 +62,7 @@ impl<R: Read + Seek + Send> Demuxer for Mp4Demuxer<R> {
             Ok(Packet {
                 data: sample.bytes.into(),
                 pts: sample.start_time,
+                duration: sample.duration,
             })
         } else {
             Err(Error::Demuxer("EOF".into()))

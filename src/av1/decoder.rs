@@ -42,10 +42,12 @@ impl<R: Read + Seek + Send> Decoder<R> {
         loop {
             while let Ok(packet) = self.demuxer.read_packet() {
                 // Send packet to the decoder
-                match self
-                    .decoder
-                    .send_data(packet.data, None, Some(packet.pts as i64), None)
-                {
+                match self.decoder.send_data(
+                    packet.data,
+                    None,
+                    Some(packet.pts as i64),
+                    Some(packet.duration as i64),
+                ) {
                     Err(e) if e.is_again() => {
                         // If the decoder did not consume all data, output all
                         // pending pictures and send pending data to the decoder
@@ -88,10 +90,9 @@ impl<R: Read + Seek + Send> Decoder<R> {
         loop {
             match self.decoder.get_picture() {
                 Ok(p) => {
-                    let pts = p.timestamp().unwrap();
-                    let timebase = self.demuxer.timebase();
-                    let timebase = timebase.0 as f64 / timebase.1 as f64;
-                    let pts = Duration::from_secs_f64(pts as f64 * timebase);
+                    let timescale = self.demuxer.timescale() as f64;
+                    let pts = Duration::from_secs_f64(p.timestamp().unwrap() as f64 / timescale);
+                    let duration = Duration::from_secs_f64(p.duration() as f64 / timescale);
                     let frame = VideoFrame {
                         image: Image::new(
                             Extent3d {
@@ -105,6 +106,7 @@ impl<R: Read + Seek + Send> Decoder<R> {
                             RenderAssetUsages::default(),
                         ),
                         timestamp: pts,
+                        duration,
                     };
                     tx.send(frame)
                         .await
@@ -194,8 +196,8 @@ impl<R: Read + Seek + Send> crate::decodable::Decoder for Decoder<R> {
         self.demuxer.height() as u32
     }
 
-    fn timebase(&self) -> (u32, u32) {
-        self.demuxer.timebase()
+    fn timescale(&self) -> u32 {
+        self.demuxer.timescale()
     }
 
     async fn decode(

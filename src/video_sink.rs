@@ -25,7 +25,6 @@ pub struct VideoSink {
     task: Task<Result<()>>,
     width: u32,
     height: u32,
-    frame_duration: Duration,
     buffered_frame: Option<VideoFrame>,
     start_timestamp: Option<Duration>,
 }
@@ -34,7 +33,6 @@ impl VideoSink {
     /// Create a new video sink.
     pub(crate) fn new(
         image: Handle<Image>,
-        timebase: (u32, u32),
         width: u32,
         height: u32,
         rx: async_channel::Receiver<VideoFrame>,
@@ -42,7 +40,6 @@ impl VideoSink {
     ) -> Self {
         Self {
             image,
-            frame_duration: Duration::from_secs_f64(timebase.0 as f64 / timebase.1 as f64),
             rx,
             task,
             width,
@@ -74,12 +71,12 @@ impl VideoSink {
             let elapsed = current_time - *start_timestamp;
 
             // Frame in the future
-            if frame.timestamp > elapsed + self.frame_duration {
+            if frame.timestamp > elapsed {
                 self.buffered_frame = Some(frame);
                 return None;
             }
             // Frame too old, discard
-            else if frame.timestamp + self.frame_duration < elapsed {
+            else if frame.timestamp + frame.duration < elapsed {
                 continue;
             }
             // Frame is current

@@ -22,7 +22,6 @@ pub fn play_videos<Source: Asset + Decodable>(
             continue;
         };
         let mut decoder = video_source.decoder()?;
-        let timebase = decoder.timebase();
         let width = decoder.width();
         let height = decoder.height();
         let image = Image::new_uninit(
@@ -38,7 +37,7 @@ pub fn play_videos<Source: Asset + Decodable>(
         let loop_ = matches!(player.mode, PlaybackMode::Loop);
         let (tx, rx) = async_channel::bounded(1); //XXX make configurable?
         let task = ComputeTaskPool::get().spawn(async move { decoder.decode(tx, loop_).await });
-        let sink = VideoSink::new(images.add(image), timebase, width, height, rx, task);
+        let sink = VideoSink::new(images.add(image), width, height, rx, task);
         commands.entity(entity).insert(sink);
     }
     Ok(())
