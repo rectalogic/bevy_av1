@@ -37,7 +37,7 @@ impl Decodable for VideoSource {
                 av1::Demuxers::Mp4(av1::mp4::Mp4Demuxer::new(Cursor::new(self.clone()))?)
             }
         };
-        Ok(Self::Decoder::new(demuxer)?)
+        Self::Decoder::new(demuxer)
     }
 }
 

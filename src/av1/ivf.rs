@@ -1,4 +1,5 @@
-use super::{Demuxer, Error, Packet};
+use super::{Demuxer, Packet};
+use bevy::ecs::error::BevyError;
 use bitstream_io::{ByteRead, ByteReader, LittleEndian};
 use std::io::{self, Read, Seek, SeekFrom};
 
@@ -7,13 +8,14 @@ pub const HEADER_SIZE: u64 = 32;
 pub struct IvfDemuxer<R: Read + Send> {
     reader: ByteReader<R, LittleEndian>,
     header: Header,
+    current_frame: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 struct Header {
     pub w: u16,
     pub h: u16,
-    pub frame_count: u32,
+    frame_count: u32,
     pub timebase: (u32, u32),
 }
 
@@ -21,7 +23,11 @@ impl<R: Read + Seek + Send> IvfDemuxer<R> {
     pub fn new(reader: R) -> io::Result<Self> {
         let mut reader = ByteReader::endian(reader, LittleEndian);
         let header = Self::read_header(&mut reader)?;
-        Ok(Self { reader, header })
+        Ok(Self {
+            reader,
+            header,
+            current_frame: 0,
+        })
     }
 
     fn read_header(br: &mut ByteReader<R, LittleEndian>) -> io::Result<Header> {
@@ -77,24 +83,26 @@ impl<R: Read + Seek + Send> Demuxer for IvfDemuxer<R> {
         self.header.timebase.1
     }
 
-    fn read_packet(&mut self) -> Result<Packet, Error> {
-        let len = self.reader.read::<u32>().map_err(Error::DemuxerIO)?;
-        let pts = self.reader.read::<u64>().map_err(Error::DemuxerIO)?;
+    fn read_packet(&mut self) -> Result<Option<Packet>, BevyError> {
+        if self.current_frame >= self.header.frame_count {
+            return Ok(None);
+        }
+        self.current_frame += 1;
+        let len = self.reader.read::<u32>()?;
+        let pts = self.reader.read::<u64>()?;
         let mut buf = vec![0u8; len as usize];
-        self.reader.read_bytes(&mut buf).map_err(Error::DemuxerIO)?;
+        self.reader.read_bytes(&mut buf)?;
 
-        Ok(Packet {
+        Ok(Some(Packet {
             data: buf,
             pts,
             duration: self.header.timebase.0,
-        })
+        }))
     }
 
-    fn reset(&mut self) -> Result<(), Error> {
-        self.reader
-            .reader()
-            .seek(SeekFrom::Start(HEADER_SIZE))
-            .map_err(Error::DemuxerIO)?;
+    fn reset(&mut self) -> Result<(), BevyError> {
+        self.current_frame = 0;
+        self.reader.reader().seek(SeekFrom::Start(HEADER_SIZE))?;
         Ok(())
     }
 }

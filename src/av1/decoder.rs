@@ -1,4 +1,6 @@
+use async_channel::SendError;
 use std::{
+    error::Error,
     io::{Read, Seek},
     time::Duration,
 };
@@ -15,7 +17,7 @@ use bevy::{
 };
 use std::result::Result;
 
-use crate::{av1, decodable::VideoFrame};
+use crate::decodable::VideoFrame;
 
 // Based on https://github.com/rust-av/dav1d-rs/blob/master/tools/src/main.rs
 
@@ -25,22 +27,22 @@ pub struct Decoder<R: Read + Seek + Send> {
 }
 
 impl<R: Read + Seek + Send> Decoder<R> {
-    pub fn new(demuxer: Demuxers<R>) -> Result<Self, av1::Error> {
+    pub fn new(demuxer: Demuxers<R>) -> Result<Self, BevyError> {
         let mut settings = dav1d::Settings::new();
         settings.set_n_threads(1);
         Ok(Self {
-            decoder: dav1d::Decoder::with_settings(&settings).map_err(av1::Error::Decoder)?,
+            decoder: dav1d::Decoder::with_settings(&settings)?,
             demuxer,
         })
     }
 
-    pub async fn decode(
+    async fn decode(
         &mut self,
         tx: async_channel::Sender<VideoFrame>,
         loop_: bool,
-    ) -> Result<(), av1::Error> {
+    ) -> Result<(), DecodeError> {
         loop {
-            while let Ok(packet) = self.demuxer.read_packet() {
+            while let Some(packet) = self.demuxer.read_packet()? {
                 // Send packet to the decoder
                 match self.decoder.send_data(
                     packet.data,
@@ -57,12 +59,12 @@ impl<R: Read + Seek + Send> Decoder<R> {
 
                             match self.decoder.send_pending_data() {
                                 Err(e) if e.is_again() => continue,
-                                Err(e) => return Err(av1::Error::Decoder(e)),
+                                Err(e) => return Err(e.into()),
                                 _ => break,
                             }
                         }
                     }
-                    Err(e) => return Err(av1::Error::Decoder(e)),
+                    Err(e) => return Err(e.into()),
                     _ => (),
                 }
 
@@ -86,7 +88,7 @@ impl<R: Read + Seek + Send> Decoder<R> {
         &mut self,
         tx: &async_channel::Sender<VideoFrame>,
         drain: bool,
-    ) -> Result<(), av1::Error> {
+    ) -> Result<(), DecodeError> {
         loop {
             match self.decoder.get_picture() {
                 Ok(p) => {
@@ -108,14 +110,12 @@ impl<R: Read + Seek + Send> Decoder<R> {
                         timestamp: pts,
                         duration,
                     };
-                    tx.send(frame)
-                        .await
-                        .map_err(|_| av1::Error::ChannelClosed)?;
+                    tx.send(frame).await?;
                 }
                 // Need to send more data to the decoder before it can decode new pictures
                 Err(e) if e.is_again() => return Ok(()),
                 Err(e) => {
-                    return Err(av1::Error::Decoder(e));
+                    return Err(e.into());
                 }
             }
 
@@ -126,7 +126,7 @@ impl<R: Read + Seek + Send> Decoder<R> {
         Ok(())
     }
 
-    fn yuv_to_bgr(&self, p: &dav1d::Picture) -> Result<Vec<u8>, av1::Error> {
+    fn yuv_to_bgr(&self, p: &dav1d::Picture) -> Result<Vec<u8>, BevyError> {
         assert!(p.bit_depth() == 8, "AV1 bit depth must be 8");
         let range = match p.color_range() {
             dav1d::pixel::YUVRange::Limited => YuvRange::Limited,
@@ -152,8 +152,7 @@ impl<R: Read + Seek + Send> Decoder<R> {
                     width: p.width(),
                     height: p.height(),
                 };
-                yuv400_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)
-                    .map_err(av1::Error::Conversion)?
+                yuv400_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
             }
             layout => {
                 let yuv_data = YuvPlanarImage {
@@ -168,16 +167,13 @@ impl<R: Read + Seek + Send> Decoder<R> {
                 };
                 match layout {
                     dav1d::PixelLayout::I420 => {
-                        yuv420_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)
-                            .map_err(av1::Error::Conversion)?
+                        yuv420_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
                     }
                     dav1d::PixelLayout::I422 => {
-                        yuv422_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)
-                            .map_err(av1::Error::Conversion)?
+                        yuv422_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
                     }
                     dav1d::PixelLayout::I444 => {
-                        yuv444_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)
-                            .map_err(av1::Error::Conversion)?
+                        yuv444_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
                     }
                     dav1d::PixelLayout::I400 => {}
                 }
@@ -206,9 +202,42 @@ impl<R: Read + Seek + Send> crate::decodable::Decoder for Decoder<R> {
         loop_: bool,
     ) -> Result<(), BevyError> {
         match Decoder::decode(self, tx, loop_).await {
-            Err(av1::Error::ChannelClosed) => Ok(()),
-            Err(e) => Err(e.into()),
+            Err(DecodeError::SendError) => Ok(()),
+            Err(DecodeError::BevyError(e)) => Err(e),
             Ok(_) => Ok(()),
         }
+    }
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+enum DecodeError {
+    BevyError(BevyError),
+    SendError,
+}
+
+impl std::fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl Error for DecodeError {}
+
+impl From<BevyError> for DecodeError {
+    fn from(error: BevyError) -> Self {
+        DecodeError::BevyError(error)
+    }
+}
+
+impl From<SendError<VideoFrame>> for DecodeError {
+    fn from(_: SendError<VideoFrame>) -> Self {
+        DecodeError::SendError
+    }
+}
+
+impl From<dav1d::Error> for DecodeError {
+    fn from(error: dav1d::Error) -> Self {
+        DecodeError::BevyError(error.into())
     }
 }

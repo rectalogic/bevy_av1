@@ -1,10 +1,7 @@
 pub mod decoder;
 pub mod ivf;
 pub mod mp4;
-use std::{
-    fmt::Display,
-    io::{Read, Seek},
-};
+use std::io::{Read, Seek};
 
 use bevy::ecs::error::BevyError;
 pub use decoder::Decoder;
@@ -19,8 +16,8 @@ trait Demuxer {
     fn width(&self) -> u16;
     fn height(&self) -> u16;
     fn timescale(&self) -> u32;
-    fn read_packet(&mut self) -> Result<Packet, Error>;
-    fn reset(&mut self) -> Result<(), Error>;
+    fn read_packet(&mut self) -> Result<Option<Packet>, BevyError>;
+    fn reset(&mut self) -> Result<(), BevyError>;
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -48,33 +45,16 @@ impl<R: Read + Seek + Send> Demuxer for Demuxers<R> {
             Demuxers::Mp4(mp4_demuxer) => mp4_demuxer.timescale(),
         }
     }
-    fn read_packet(&mut self) -> Result<Packet, Error> {
+    fn read_packet(&mut self) -> Result<Option<Packet>, BevyError> {
         match self {
             Demuxers::Ivf(ivf_demuxer) => ivf_demuxer.read_packet(),
             Demuxers::Mp4(mp4_demuxer) => mp4_demuxer.read_packet(),
         }
     }
-    fn reset(&mut self) -> Result<(), Error> {
+    fn reset(&mut self) -> Result<(), BevyError> {
         match self {
             Demuxers::Ivf(ivf_demuxer) => ivf_demuxer.reset(),
             Demuxers::Mp4(mp4_demuxer) => mp4_demuxer.reset(),
         }
     }
 }
-
-#[derive(Debug)]
-pub enum Error {
-    DemuxerIO(std::io::Error),
-    Demuxer(BevyError),
-    ChannelClosed,
-    Decoder(dav1d::Error),
-    Conversion(yuv::YuvError),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-
-impl std::error::Error for Error {}
