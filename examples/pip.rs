@@ -69,7 +69,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands
         .spawn(VideoPlayer::new(
-            asset_server.load("av1/cosmos-laundromat.ivf"),
+            asset_server.load("av1/cosmos-laundromat.mp4"),
             PlaybackMode::Remove,
         ))
         .observe(
