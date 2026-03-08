@@ -27,6 +27,7 @@ pub struct VideoSink {
     height: u32,
     buffered_frame: Option<VideoFrame>,
     start_timestamp: Option<Duration>,
+    elapsed_time: Option<Duration>,
 }
 
 impl VideoSink {
@@ -46,6 +47,7 @@ impl VideoSink {
             height,
             buffered_frame: None,
             start_timestamp: None,
+            elapsed_time: None,
         }
     }
 
@@ -68,7 +70,8 @@ impl VideoSink {
     pub(crate) fn next_frame(&mut self, current_time: Duration) -> Option<VideoFrame> {
         while let Some(frame) = self.fetch_frame() {
             let start_timestamp = self.start_timestamp.get_or_insert(current_time);
-            let elapsed = current_time - *start_timestamp;
+            self.elapsed_time = Some(current_time - *start_timestamp);
+            let elapsed = self.elapsed_time.unwrap();
 
             // Frame in the future
             if frame.timestamp > elapsed {
@@ -83,6 +86,14 @@ impl VideoSink {
             return Some(frame);
         }
         None
+    }
+
+    pub(crate) fn halt_frame(&mut self, current_time: Duration) {
+        if self.start_timestamp.is_none() || self.elapsed_time.is_none() {
+            return;
+        };
+
+        self.start_timestamp = Some(current_time - self.elapsed_time.unwrap());
     }
 
     /// Width of a video frame.
