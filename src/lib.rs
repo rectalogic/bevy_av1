@@ -38,6 +38,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 use bevy::prelude::*;
 
 mod av1;
+mod av1d;
 mod decodable;
 mod systems;
 mod video;

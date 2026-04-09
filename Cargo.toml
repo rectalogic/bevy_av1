@@ -10,6 +10,11 @@ keywords = ["bevy", "video", "av1"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rectalogic/bevy_av1"
 
+[features]
+default = ["rav1d"]
+dav1d = ["dep:dav1d"]
+rav1d = ["dep:rav1d"]
+
 [dependencies]
 async-channel = "2.5.0"
 bevy = { version = "0.18", default-features = false, features = [
@@ -18,7 +23,8 @@ bevy = { version = "0.18", default-features = false, features = [
     "bevy_log",
 ] }
 bitstream-io = "4.9.0"
-dav1d = "0.11.0"
+dav1d = { version = "0.11.0", optional = true }
+rav1d = { path = "../experiments/vendor/rav1d", optional = true }
 mp4 = "0.14.0"
 yuv = "0.8.11"
 

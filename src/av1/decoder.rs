@@ -10,6 +10,7 @@ use yuv::{
 };
 
 use super::{Demuxer, Demuxers};
+use crate::av1d;
 use bevy::{
     asset::RenderAssetUsages,
     prelude::*,
@@ -22,16 +23,16 @@ use crate::decodable::VideoFrame;
 // Based on https://github.com/rust-av/dav1d-rs/blob/master/tools/src/main.rs
 
 pub struct Decoder<R: Read + Seek + Send> {
-    decoder: dav1d::Decoder,
+    decoder: av1d::Decoder,
     demuxer: Demuxers<R>,
 }
 
 impl<R: Read + Seek + Send> Decoder<R> {
     pub fn new(demuxer: Demuxers<R>) -> Result<Self, BevyError> {
-        let mut settings = dav1d::Settings::new();
+        let mut settings = av1d::Settings::new();
         settings.set_n_threads(1);
         Ok(Self {
-            decoder: dav1d::Decoder::with_settings(&settings)?,
+            decoder: av1d::Decoder::with_settings(&settings)?,
             demuxer,
         })
     }
@@ -45,7 +46,7 @@ impl<R: Read + Seek + Send> Decoder<R> {
             while let Some(packet) = self.demuxer.read_packet()? {
                 // Send packet to the decoder
                 match self.decoder.send_data(
-                    packet.data,
+                    packet.data.into(),
                     None,
                     Some(packet.pts as i64),
                     Some(packet.duration as i64),
@@ -126,29 +127,28 @@ impl<R: Read + Seek + Send> Decoder<R> {
         Ok(())
     }
 
-    fn yuv_to_bgr(&self, p: &dav1d::Picture) -> Result<Vec<u8>, BevyError> {
+    fn yuv_to_bgr(&self, p: &av1d::Picture) -> Result<Vec<u8>, BevyError> {
         assert!(p.bit_depth() == 8, "AV1 bit depth must be 8");
         let range = match p.color_range() {
-            dav1d::pixel::YUVRange::Limited => YuvRange::Limited,
-            dav1d::pixel::YUVRange::Full => YuvRange::Full,
+            av1d::pixel::YUVRange::Limited => YuvRange::Limited,
+            av1d::pixel::YUVRange::Full => YuvRange::Full,
         };
         let matrix = match p.matrix_coefficients() {
-            dav1d::pixel::MatrixCoefficients::BT709 => YuvStandardMatrix::Bt709,
-            dav1d::pixel::MatrixCoefficients::BT470BG
-            | dav1d::pixel::MatrixCoefficients::ST170M => YuvStandardMatrix::Bt601,
-            dav1d::pixel::MatrixCoefficients::ST240M => YuvStandardMatrix::Smpte240,
-            dav1d::pixel::MatrixCoefficients::BT2020NonConstantLuminance
-            | dav1d::pixel::MatrixCoefficients::BT2020ConstantLuminance => {
-                YuvStandardMatrix::Bt2020
+            av1d::pixel::MatrixCoefficients::BT709 => YuvStandardMatrix::Bt709,
+            av1d::pixel::MatrixCoefficients::BT470BG | av1d::pixel::MatrixCoefficients::ST170M => {
+                YuvStandardMatrix::Bt601
             }
+            av1d::pixel::MatrixCoefficients::ST240M => YuvStandardMatrix::Smpte240,
+            av1d::pixel::MatrixCoefficients::BT2020NonConstantLuminance
+            | av1d::pixel::MatrixCoefficients::BT2020ConstantLuminance => YuvStandardMatrix::Bt2020,
             _ => YuvStandardMatrix::Bt601,
         };
         let mut bgra_data = vec![0; (p.width() * p.height() * 4) as usize];
         match p.pixel_layout() {
-            dav1d::PixelLayout::I400 => {
+            av1d::PixelLayout::I400 => {
                 let yuv_data = YuvGrayImage {
-                    y_plane: &p.plane(dav1d::PlanarImageComponent::Y),
-                    y_stride: p.stride(dav1d::PlanarImageComponent::Y),
+                    y_plane: &p.plane(av1d::PlanarImageComponent::Y),
+                    y_stride: p.stride(av1d::PlanarImageComponent::Y),
                     width: p.width(),
                     height: p.height(),
                 };
@@ -156,26 +156,26 @@ impl<R: Read + Seek + Send> Decoder<R> {
             }
             layout => {
                 let yuv_data = YuvPlanarImage {
-                    y_plane: &p.plane(dav1d::PlanarImageComponent::Y),
-                    y_stride: p.stride(dav1d::PlanarImageComponent::Y),
-                    u_plane: &p.plane(dav1d::PlanarImageComponent::U),
-                    u_stride: p.stride(dav1d::PlanarImageComponent::U),
-                    v_plane: &p.plane(dav1d::PlanarImageComponent::V),
-                    v_stride: p.stride(dav1d::PlanarImageComponent::V),
+                    y_plane: &p.plane(av1d::PlanarImageComponent::Y),
+                    y_stride: p.stride(av1d::PlanarImageComponent::Y),
+                    u_plane: &p.plane(av1d::PlanarImageComponent::U),
+                    u_stride: p.stride(av1d::PlanarImageComponent::U),
+                    v_plane: &p.plane(av1d::PlanarImageComponent::V),
+                    v_stride: p.stride(av1d::PlanarImageComponent::V),
                     width: p.width(),
                     height: p.height(),
                 };
                 match layout {
-                    dav1d::PixelLayout::I420 => {
+                    av1d::PixelLayout::I420 => {
                         yuv420_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
                     }
-                    dav1d::PixelLayout::I422 => {
+                    av1d::PixelLayout::I422 => {
                         yuv422_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
                     }
-                    dav1d::PixelLayout::I444 => {
+                    av1d::PixelLayout::I444 => {
                         yuv444_to_bgra(&yuv_data, &mut bgra_data, p.width() * 4, range, matrix)?
                     }
-                    dav1d::PixelLayout::I400 => {}
+                    av1d::PixelLayout::I400 => {}
                 }
             }
         };
@@ -236,8 +236,8 @@ impl From<SendError<VideoFrame>> for DecodeError {
     }
 }
 
-impl From<dav1d::Error> for DecodeError {
-    fn from(error: dav1d::Error) -> Self {
+impl From<av1d::Error> for DecodeError {
+    fn from(error: av1d::Error) -> Self {
         DecodeError::BevyError(error.into())
     }
 }
